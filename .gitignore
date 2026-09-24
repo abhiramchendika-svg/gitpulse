@@ -1,0 +1,31 @@
+# --- Secrets: never commit ---
+.env
+.env.*
+!.env.example
+
+# --- Backend (Maven) ---
+backend/target/
+backend/.mvn/wrapper/maven-wrapper.jar
+
+# --- Frontend (see also frontend/.gitignore) ---
+node_modules/
+frontend/dist/
+frontend/coverage/
+
+# --- IDEs ---
+.idea/
+*.iml
+.vscode/*
+!.vscode/extensions.json
+.classpath
+.project
+.settings/
+.factorypath
+
+# --- Local tool config ---
+.claude/
+
+# --- OS / logs ---
+.DS_Store
+Thumbs.db
+*.log

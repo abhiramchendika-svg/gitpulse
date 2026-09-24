@@ -1,0 +1,39 @@
+spring:
+  application:
+    name: gitpulse
+  config:
+    # Optionally load secrets from a local .env file (KEY=value lines, never committed).
+    # Checked in the backend folder and the repository root, so `./mvnw spring-boot:run`
+    # works from backend/ with a .env at the repo root.
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:../.env[.properties]
+  mvc:
+    problemdetails:
+      enabled: true
+
+server:
+  port: ${PORT:8080}
+  error:
+    include-stacktrace: never
+    include-message: never
+
+gitpulse:
+  github:
+    base-url: https://api.github.com
+    # Empty = anonymous access (60 requests/hour). Set GITHUB_TOKEN for 5,000/hour.
+    token: ${GITHUB_TOKEN:}
+    api-version: "2022-11-28"
+    connect-timeout: 5s
+    read-timeout: 20s
+  cors:
+    allowed-origins: ${GITPULSE_CORS_ALLOWED_ORIGINS:http://localhost:5173}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
