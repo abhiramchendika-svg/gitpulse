@@ -1,14 +1,29 @@
-/* Design tokens. Components use these variables, never raw colours, so the dark theme is free. */
+/* Design tokens. Components use these variables, never raw colours, so the dark theme is free.
+   Chart colours: one validated series hue (blue) and a single-hue sequential ramp for the
+   heatmap; dark mode uses its own validated steps, not an automatic inversion. */
 :root {
   --bg: #f6f8fa;
   --surface: #ffffff;
+  --surface-muted: #f6f8fa;
   --border: #d0d7de;
   --text: #1f2328;
   --text-muted: #59636e;
   --accent: #1f6feb;
   --success: #1a7f37;
+  --warning: #9a6700;
   --danger: #cf222e;
   --radius: 8px;
+
+  /* Charts */
+  --series-1: #2a78d6;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --heat-0: #eff2f5;
+  --heat-1: #cde2fb;
+  --heat-2: #86b6ef;
+  --heat-3: #3987e5;
+  --heat-4: #1c5cab;
+  --heat-5: #0d366b;
 
   color-scheme: light dark;
   font-family:
@@ -26,12 +41,25 @@
   :root {
     --bg: #0d1117;
     --surface: #151b23;
+    --surface-muted: #1b222c;
     --border: #3d444d;
     --text: #e6edf3;
     --text-muted: #9198a1;
     --accent: #4493f8;
     --success: #3fb950;
+    --warning: #d29922;
     --danger: #f85149;
+
+    --series-1: #3987e5;
+    --grid: #2c2c2a;
+    --axis: #383835;
+    /* In dark mode "near zero" recedes toward the dark surface, so the ramp runs dark -> light. */
+    --heat-0: #1f2630;
+    --heat-1: #104281;
+    --heat-2: #1c5cab;
+    --heat-3: #2a78d6;
+    --heat-4: #6da7ec;
+    --heat-5: #b7d3f6;
   }
 }
 
@@ -45,6 +73,16 @@ body {
   margin: 0;
   min-width: 320px;
   background: var(--bg);
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.25;
+}
+
+a {
+  color: var(--accent);
 }
 
 button {
@@ -66,7 +104,31 @@ button:disabled {
   cursor: default;
 }
 
+input {
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.4rem 0.7rem;
+}
+
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+/* Tables of numbers align digits vertically. */
+table {
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }

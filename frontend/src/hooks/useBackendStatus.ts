@@ -12,7 +12,10 @@ export type BackendStatus =
  * Checks that the backend is alive, then asks it for the remaining GitHub API quota.
  * The two are reported separately: the backend can be healthy while GitHub is unreachable.
  */
-export function useBackendStatus(): { status: BackendStatus; refresh: () => void } {
+export function useBackendStatus(refreshKey?: string): {
+  status: BackendStatus
+  refresh: () => void
+} {
   const [status, setStatus] = useState<BackendStatus>({ state: 'loading' })
   const [attempt, setAttempt] = useState(0)
 
@@ -47,7 +50,8 @@ export function useBackendStatus(): { status: BackendStatus; refresh: () => void
     void load()
     // Cancel in-flight requests if the component unmounts or refresh() is called again.
     return () => controller.abort()
-  }, [attempt])
+    // refreshKey: callers pass e.g. the current repository so quota is re-read after analyses.
+  }, [attempt, refreshKey])
 
   return { status, refresh }
 }

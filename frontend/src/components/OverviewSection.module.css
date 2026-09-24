@@ -1,0 +1,90 @@
+.heading {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.avatar {
+  border-radius: 8px;
+  flex: none;
+}
+
+.titleBlock {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.name {
+  margin: 0;
+  font-size: 1.35rem;
+  overflow-wrap: anywhere;
+}
+
+.name a {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.name a:hover {
+  text-decoration: underline;
+}
+
+.badges {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.badge {
+  font-size: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0 0.5rem;
+  color: var(--text-muted);
+}
+
+.description {
+  margin: 0.6rem 0 0;
+  color: var(--text-muted);
+}
+
+.topics {
+  list-style: none;
+  padding: 0;
+  margin: 0.6rem 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.topics li {
+  font-size: 0.75rem;
+  background: var(--surface-muted);
+  border-radius: 999px;
+  padding: 0.1rem 0.55rem;
+}
+
+.heading + *,
+.description + *,
+.topics + * {
+  margin-top: 1rem;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0 0;
+  font-size: 0.875rem;
+}
+
+.facts dt {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.facts dd {
+  margin: 0;
+}

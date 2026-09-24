@@ -1,0 +1,203 @@
+import { act, render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { StrictMode } from 'react'
+import { describe, expect, it, vi } from 'vitest'
+import App from './App'
+import * as fx from './test/fixtures'
+
+type Route = (url: URL) => Response | undefined
+
+/**
+ * Fake backend: the first matching route answers. Health and rate-limit always answer so the
+ * header badge works. Returns the mock so tests can inspect which URLs were requested.
+ */
+function mockBackend(route: Route) {
+  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const url = new URL(String(input), 'http://localhost')
+    if (url.pathname === '/actuator/health') return Response.json({ status: 'UP' })
+    if (url.pathname === '/api/v1/rate-limit') return Response.json(fx.rateLimit)
+    const response = route(url)
+    if (!response) throw new Error(`Unexpected request: ${url.pathname}${url.search}`)
+    return response
+  })
+  vi.stubGlobal('fetch', fetchMock)
+  return fetchMock
+}
+
+const REPO_BASE = '/api/v1/repositories/octocat/hello-world'
+
+function happyRoutes(overrides: { contributors?: () => Response } = {}): Route {
+  return (url) => {
+    switch (url.pathname) {
+      case REPO_BASE:
+        return Response.json(fx.overview)
+      case `${REPO_BASE}/languages`:
+        return Response.json(fx.languages)
+      case `${REPO_BASE}/commits`:
+        return Response.json(fx.commits())
+      case `${REPO_BASE}/contributors`:
+        return overrides.contributors?.() ?? Response.json(fx.contributors())
+    }
+  }
+}
+
+function requested(fetchMock: ReturnType<typeof mockBackend>, pathPart: string) {
+  return fetchMock.mock.calls.map(([input]) => String(input)).filter((u) => u.includes(pathPart))
+}
+
+async function analyse(text: string) {
+  await userEvent.type(screen.getByRole('textbox', { name: 'GitHub repository' }), text)
+  await userEvent.click(screen.getByRole('button', { name: 'Analyse' }))
+}
+
+describe('App', () => {
+  it('shows the landing page with backend status before a repository is chosen', async () => {
+    mockBackend(() => undefined)
+
+    render(<App />)
+
+    expect(await screen.findByText(/45 \/ 60 left/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'spring-projects/spring-petclinic' })).toBeVisible()
+  })
+
+  it('rejects invalid input without calling the backend', async () => {
+    const fetchMock = mockBackend(() => undefined)
+    render(<App />)
+
+    await analyse('https://gitlab.com/a/b')
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Only github.com repository URLs')
+    expect(requested(fetchMock, '/repositories/')).toHaveLength(0)
+  })
+
+  it('analyses a repository end to end and puts it in the URL', async () => {
+    mockBackend(happyRoutes())
+    render(<App />)
+
+    await analyse('https://github.com/octocat/hello-world')
+
+    // Overview
+    expect(await screen.findByRole('link', { name: 'octocat/hello-world' })).toBeInTheDocument()
+    expect(screen.getByText('12.3K')).toBeInTheDocument()
+    // Commit activity
+    expect(await screen.findByRole('heading', { name: 'Commits per week' })).toBeInTheDocument()
+    expect(screen.getByText('Fix the login redirect')).toBeInTheDocument()
+    expect(screen.getByText(/Busiest: Tue 14:00 UTC \(3 commits\)/)).toBeInTheDocument()
+    expect(screen.getByText(/now \(no commits since\)/)).toBeInTheDocument()
+    // All-time
+    const table = await screen.findByRole('table', { name: 'Contributors by commits' })
+    expect(within(table).getByRole('link', { name: 'mona' })).toBeInTheDocument()
+    expect(within(table).getByText('1,200')).toBeInTheDocument()
+    const languagesCard = await screen.findByRole('region', { name: 'Languages' })
+    const bars = within(languagesCard).getAllByRole('listitem')
+    expect(bars.map((li) => li.textContent)).toEqual([
+      'Java70% percent of code',
+      'TypeScript30% percent of code',
+    ])
+
+    expect(window.location.search).toBe('?repo=octocat%2Fhello-world')
+  })
+
+  it('shows one clear error for a missing repository and skips the other requests', async () => {
+    const fetchMock = mockBackend((url) =>
+      url.pathname === '/api/v1/repositories/octocat/nope'
+        ? Response.json(
+            { status: 404, code: 'REPOSITORY_NOT_FOUND', detail: 'not found' },
+            { status: 404 },
+          )
+        : undefined,
+    )
+    render(<App />)
+
+    await analyse('octocat/nope')
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Repository not found')
+    expect(requested(fetchMock, '/commits')).toHaveLength(0)
+    expect(requested(fetchMock, '/contributors')).toHaveLength(0)
+    expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument()
+  })
+
+  it('refetches commits for a new range, keeps other sections, and updates the URL', async () => {
+    const fetchMock = mockBackend(happyRoutes())
+    render(<App />)
+    await analyse('octocat/hello-world')
+    await screen.findByRole('heading', { name: 'Commits per week' })
+
+    await userEvent.click(screen.getByRole('radio', { name: 'Last 30 days' }))
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Exclude bots' }))
+
+    await waitFor(() => {
+      const last = requested(fetchMock, '/commits').at(-1) ?? ''
+      expect(last).toMatch(/since=\d{4}-\d{2}-\d{2}/)
+      expect(last).toContain('excludeBots=true')
+    })
+    expect(window.location.search).toBe('?repo=octocat%2Fhello-world&range=30d&bots=exclude')
+    // Contributors and languages are all-time: not refetched for a new window.
+    expect(requested(fetchMock, '/contributors')).toHaveLength(1)
+    expect(requested(fetchMock, '/languages')).toHaveLength(1)
+  })
+
+  it('explains when GitHub is still computing line statistics', async () => {
+    mockBackend(happyRoutes({ contributors: () => Response.json(fx.contributors('PENDING')) }))
+    render(<App />)
+
+    await analyse('octocat/hello-world')
+
+    expect(await screen.findByText(/GitHub is computing line statistics/)).toBeInTheDocument()
+  })
+
+  it('warns when the commit sample was truncated', async () => {
+    mockBackend((url) =>
+      url.pathname === `${REPO_BASE}/commits`
+        ? Response.json(
+            fx.commits({
+              meta: {
+                ...fx.commits().meta,
+                truncated: true,
+                sampleSize: 1000,
+                since: '2026-09-15T00:00:00Z',
+              },
+            }),
+          )
+        : happyRoutes()(url),
+    )
+    render(<App />)
+
+    await analyse('octocat/hello-world')
+
+    expect(await screen.findByText(/more than 1,000 commits/)).toBeInTheDocument()
+  })
+
+  it('browser back returns from the landing page to the previous repository', async () => {
+    mockBackend(happyRoutes())
+    const lengthBefore = window.history.length
+    render(
+      <StrictMode>
+        <App />
+      </StrictMode>,
+    )
+    await analyse('octocat/hello-world')
+    await screen.findByRole('link', { name: 'octocat/hello-world' })
+
+    await userEvent.click(screen.getByRole('link', { name: 'GitPulse' }))
+    expect(window.location.search).toBe('')
+    // Exactly two entries added (repo, then home), even under StrictMode's double-invocation.
+    expect(window.history.length).toBe(lengthBefore + 2)
+
+    act(() => {
+      window.history.back()
+    })
+    await waitFor(() => expect(window.location.search).toBe('?repo=octocat%2Fhello-world'))
+    expect(await screen.findByRole('link', { name: 'octocat/hello-world' })).toBeInTheDocument()
+  })
+
+  it('opens the dashboard straight from a shared link', async () => {
+    window.history.replaceState(null, '', '/?repo=octocat/hello-world&range=90d')
+    mockBackend(happyRoutes())
+
+    render(<App />)
+
+    expect(await screen.findByRole('link', { name: 'octocat/hello-world' })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'Last 90 days' })).toBeChecked()
+  })
+})

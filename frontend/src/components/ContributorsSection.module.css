@@ -1,0 +1,94 @@
+.status {
+  margin: 0.75rem 0;
+}
+
+.status:empty {
+  display: none;
+}
+
+.scroll {
+  overflow-x: auto;
+  margin-top: 0.75rem;
+}
+
+.table {
+  width: 100%;
+  font-size: 0.875rem;
+}
+
+.table th,
+.table td {
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.table th {
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+
+.table th:nth-child(2),
+.table td:nth-child(2) {
+  text-align: left;
+}
+
+.rank {
+  color: var(--text-muted);
+}
+
+.who {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.who img {
+  border-radius: 50%;
+}
+
+.tag {
+  font-size: 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0 0.4rem;
+  color: var(--text-muted);
+}
+
+.table th:nth-child(4),
+.table td.share {
+  text-align: left;
+}
+
+.share {
+  min-width: 10rem;
+}
+
+.shareValue {
+  display: inline-block;
+  width: 3.25rem;
+  text-align: right;
+  margin-right: 0.6rem;
+}
+
+.shareTrack {
+  display: inline-block;
+  width: 5.5rem;
+  height: 6px;
+  vertical-align: middle;
+}
+
+.shareBar {
+  display: block;
+  height: 100%;
+  min-width: 1px;
+  background: var(--series-1);
+  border-radius: 0 3px 3px 0;
+}
+
+.more {
+  margin-top: 0.75rem;
+  align-self: flex-start;
+}

@@ -1,0 +1,40 @@
+.details {
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+}
+
+.details summary {
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+.scroll {
+  overflow-x: auto;
+  max-height: 20rem;
+  margin-top: 0.5rem;
+}
+
+.table {
+  width: 100%;
+}
+
+.table th,
+.table td {
+  text-align: right;
+  padding: 0.25rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.table th:first-child,
+.table td:first-child {
+  text-align: left;
+}
+
+.table th {
+  color: var(--text-muted);
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+}

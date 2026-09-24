@@ -1,0 +1,19 @@
+.badge {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.down {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.low {
+  color: var(--warning);
+  border-color: var(--warning);
+}

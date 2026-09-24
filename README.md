@@ -3,9 +3,23 @@
 **GitHub repository & commit analyzer.** GitPulse turns public GitHub activity (commits,
 contributors, languages, pull requests, issues) into factual, descriptive analytics.
 
-> **Status: early development (Phase 2 – repository analysis).** The backend analyses repository
-> metadata, languages, commit activity and contributors. The dashboard arrives in Phase 3; see
-> [Roadmap](#roadmap).
+> **Status: early development (Phase 3 – dashboard).** Enter a repository to see its overview,
+> commit activity (weekly chart, weekday × hour heatmap, authors, quiet periods), contributors
+> and languages. Pull request and issue analytics come next; see [Roadmap](#roadmap).
+
+<!-- Screenshots: add docs/screenshots/dashboard.png once the repository is published. -->
+
+## Features
+
+- **Overview:** stars, forks, watchers, open issues + PRs, license, dates, size.
+- **Commit activity** for the last 30 days, 90 days or year: commits per week, when commits
+  happen (weekday × UTC hour), most active authors, periods of inactivity, recent commits, with
+  an option to exclude bots.
+- **Contributors:** commit shares, how many people account for half of all commits, and lines
+  added/deleted where GitHub provides them.
+- **Languages:** share of code by size.
+- Every view is a shareable link (`?repo=owner/name&range=90d`), and every chart has a table
+  view. Paste `owner/repo` or any GitHub URL.
 
 GitPulse analyses _data_, not _people_: it reports activity, frequency and distribution, and
 every calculated metric has a documented formula in [docs/metrics.md](docs/metrics.md). It
@@ -22,7 +36,8 @@ React + TypeScript (Vite)  ──HTTP/JSON──▶  Spring Boot backend  ──
 - `backend/`: Java 21+, Spring Boot 4, Maven. Owns all GitHub communication, the token,
   pagination, rate-limit handling, caching (Caffeine) and analytics. Analyzers in
   `analysis/` are plain Java with no Spring or HTTP dependencies, so every formula is unit-tested.
-- `frontend/`: React 19 + TypeScript + Vite. Talks only to the backend.
+- `frontend/`: React 19 + TypeScript + Vite, Recharts for charts. Talks only to the backend;
+  dashboard state lives in the URL. The dashboard (and its chart library) is lazy-loaded.
 
 ## Prerequisites
 
@@ -48,8 +63,8 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173. The status panel shows whether the backend is up and how much
-GitHub API quota remains.
+Open http://localhost:5173 and enter a repository, e.g. `spring-projects/spring-petclinic`.
+The header shows how much GitHub API quota the backend has left.
 
 ## Environment variables
 
@@ -102,7 +117,7 @@ Formatting: `./mvnw spotless:apply` (Java, google-java-format) and `npm run form
 
 1. ✅ Project foundation: backend, frontend, GitHub client, health, CI
 2. ✅ Repository analysis: metadata, commits, contributors, languages
-3. Dashboard: charts and responsive layout
+3. ✅ Dashboard: charts and responsive layout
 4. Pull request and issue analytics
 5. File activity, repository comparison, profile analysis, caching
 6. Export (CSV/JSON) and full open-source documentation

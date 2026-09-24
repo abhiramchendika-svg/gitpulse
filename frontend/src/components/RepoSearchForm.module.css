@@ -1,0 +1,31 @@
+.form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 0;
+  max-width: 34rem;
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+}
+
+.button {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+.button:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.error {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--danger);
+  font-size: 0.85rem;
+}

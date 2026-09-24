@@ -1,0 +1,36 @@
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  margin-bottom: 0.75rem;
+}
+
+.header h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.subtitle {
+  margin: 0.15rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.stale {
+  opacity: 0.5;
+  transition: opacity 150ms;
+}
+
+.source {
+  margin-top: auto;
+  padding-top: 0.75rem;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}

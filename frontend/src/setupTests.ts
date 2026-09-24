@@ -7,4 +7,14 @@ import { afterEach } from 'vitest'
 // explicitly instead, so unmount rendered components after every test ourselves.
 afterEach(() => {
   cleanup()
+  // Dashboard state lives in the URL; start every test from a clean address.
+  window.history.replaceState(null, '', '/')
 })
+
+// jsdom has no layout engine and no ResizeObserver, which Recharts' ResponsiveContainer needs.
+class ResizeObserverStub {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+globalThis.ResizeObserver ??= ResizeObserverStub as unknown as typeof ResizeObserver

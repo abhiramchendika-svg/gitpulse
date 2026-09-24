@@ -1,0 +1,86 @@
+.figure {
+  margin: 0;
+  min-width: 0;
+}
+
+.plot {
+  width: 100%;
+  min-width: 0;
+}
+
+.tooltip {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.85rem;
+  color: var(--text);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.12);
+}
+
+.tooltipLabel {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+/* Heatmap */
+.readout {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  min-height: 1.3em;
+}
+
+.heatmap {
+  display: grid;
+  gap: 2px;
+}
+
+.heatRow {
+  display: grid;
+  grid-template-columns: 2.4rem repeat(24, minmax(0, 1fr));
+  gap: 2px;
+  align-items: center;
+}
+
+.heatDay {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.heatCell {
+  aspect-ratio: 1;
+  border-radius: 2px;
+  min-width: 0;
+}
+
+.heatCellActive {
+  outline: 2px solid var(--text);
+  outline-offset: -1px;
+}
+
+.heatHour {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.heatLegend {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 0.6rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.heatLegendGap {
+  width: 0.75rem;
+}
+
+.heatSwatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+}
