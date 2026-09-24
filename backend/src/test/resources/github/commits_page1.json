@@ -1,0 +1,24 @@
+[
+  {
+    "sha": "aaaaaaa1111111111111111111111111111111111",
+    "html_url": "https://github.com/octocat/Hello-World/commit/aaaaaaa1",
+    "commit": {
+      "author": { "name": "Mona Lisa", "email": "mona@example.com", "date": "2026-09-20T10:00:00Z" },
+      "committer": { "name": "GitHub", "email": "noreply@github.com", "date": "2026-09-20T10:05:00Z" },
+      "message": "Fix login redirect\n\nLonger explanation of the change."
+    },
+    "author": { "login": "octocat", "id": 1, "type": "User", "avatar_url": "a", "html_url": "h" },
+    "parents": [{ "sha": "p1" }]
+  },
+  {
+    "sha": "bbbbbbb2222222222222222222222222222222222",
+    "html_url": "https://github.com/octocat/Hello-World/commit/bbbbbbb2",
+    "commit": {
+      "author": { "name": "Someone Unlinked", "email": "x@example.com", "date": "2026-09-18T08:00:00Z" },
+      "committer": { "name": "Someone Unlinked", "email": "x@example.com", "date": "2026-09-18T08:00:00Z" },
+      "message": "Merge branch 'feature'"
+    },
+    "author": null,
+    "parents": [{ "sha": "p2" }, { "sha": "p3" }]
+  }
+]

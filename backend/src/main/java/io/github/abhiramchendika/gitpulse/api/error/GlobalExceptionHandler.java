@@ -5,8 +5,11 @@ import io.github.abhiramchendika.gitpulse.github.exception.GitHubAuthenticationE
 import io.github.abhiramchendika.gitpulse.github.exception.GitHubNotFoundException;
 import io.github.abhiramchendika.gitpulse.github.exception.GitHubRateLimitException;
 import io.github.abhiramchendika.gitpulse.github.exception.GitHubUnavailableException;
+import io.github.abhiramchendika.gitpulse.service.InvalidRequestException;
+import io.github.abhiramchendika.gitpulse.service.RepositoryNotFoundException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
@@ -17,6 +20,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 /**
@@ -31,6 +35,23 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
   private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+  @ExceptionHandler(RepositoryNotFoundException.class)
+  ResponseEntity<ProblemDetail> handleRepositoryNotFound(RepositoryNotFoundException e) {
+    // The name was validated against a strict allow-list, so echoing it back is safe.
+    return problem(
+        HttpStatus.NOT_FOUND,
+        ErrorCode.REPOSITORY_NOT_FOUND,
+        "Repository '"
+            + e.getFullName()
+            + "' was not found. It may not exist, or it may be private (GitHub reports both the"
+            + " same way).");
+  }
+
+  @ExceptionHandler(InvalidRequestException.class)
+  ResponseEntity<ProblemDetail> handleInvalidRequest(InvalidRequestException e) {
+    return problem(HttpStatus.BAD_REQUEST, ErrorCode.INVALID_INPUT, e.getMessage());
+  }
 
   @ExceptionHandler(GitHubNotFoundException.class)
   ResponseEntity<ProblemDetail> handleNotFound(GitHubNotFoundException e) {
@@ -91,6 +112,23 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         HttpStatus.INTERNAL_SERVER_ERROR,
         ErrorCode.INTERNAL_ERROR,
         "An unexpected error occurred.");
+  }
+
+  /** Path/query parameters that failed {@code @Pattern} etc.: name the offending parameters. */
+  @Override
+  protected ResponseEntity<Object> handleHandlerMethodValidationException(
+      HandlerMethodValidationException ex,
+      HttpHeaders headers,
+      HttpStatusCode status,
+      WebRequest request) {
+    String parameters =
+        ex.getParameterValidationResults().stream()
+            .map(result -> result.getMethodParameter().getParameterName())
+            .distinct()
+            .collect(Collectors.joining(", "));
+    ProblemDetail body =
+        body(HttpStatus.BAD_REQUEST, ErrorCode.INVALID_INPUT, "Invalid value for: " + parameters);
+    return handleExceptionInternal(ex, body, headers, status, request);
   }
 
   /** Adds our {@code code} field to Spring MVC's own errors (unknown route, bad parameter...). */

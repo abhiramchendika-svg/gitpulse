@@ -7,6 +7,7 @@ package io.github.abhiramchendika.gitpulse.api.error;
 public enum ErrorCode {
   INVALID_INPUT,
   NOT_FOUND,
+  REPOSITORY_NOT_FOUND,
   RATE_LIMITED,
   GITHUB_AUTH_FAILED,
   GITHUB_UNAVAILABLE,

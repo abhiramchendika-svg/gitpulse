@@ -11,6 +11,13 @@ spring:
   mvc:
     problemdetails:
       enabled: true
+  cache:
+    type: caffeine
+    cache-names: repositories,languages,commits,commitCounts,contributors,contributorStats
+    # Each cache keeps at most 500 entries for 10 minutes: fresh enough for activity data,
+    # and repeated dashboard loads cost zero GitHub requests.
+    caffeine:
+      spec: maximumSize=500,expireAfterWrite=10m
 
 server:
   port: ${PORT:8080}
@@ -26,6 +33,18 @@ gitpulse:
     api-version: "2022-11-28"
     connect-timeout: 5s
     read-timeout: 20s
+  analysis:
+    # 10 pages x 100 = at most 1,000 commits (10 requests) per analysis window.
+    max-commit-pages: 10
+    # 5 pages x 100 = 500 contributors, the most GitHub links to accounts.
+    max-contributor-pages: 5
+    default-window-days: 365
+    max-window-days: 3650
+    inactivity-threshold: 14d
+    top-authors: 10
+    recent-commits: 10
+    inactivity-periods: 10
+    contributor-limit: 100
   cors:
     allowed-origins: ${GITPULSE_CORS_ALLOWED_ORIGINS:http://localhost:5173}
 

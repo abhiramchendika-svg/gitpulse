@@ -3,12 +3,13 @@
 **GitHub repository & commit analyzer.** GitPulse turns public GitHub activity (commits,
 contributors, languages, pull requests, issues) into factual, descriptive analytics.
 
-> **Status: early development (Phase 1 – project foundation).** The backend, frontend and CI
-> skeleton work. Repository analytics arrive in the next phases; see [Roadmap](#roadmap).
+> **Status: early development (Phase 2 – repository analysis).** The backend analyses repository
+> metadata, languages, commit activity and contributors. The dashboard arrives in Phase 3; see
+> [Roadmap](#roadmap).
 
 GitPulse analyses _data_, not _people_: it reports activity, frequency and distribution, and
-every calculated metric will have a documented formula. It never scores developer productivity
-or code quality.
+every calculated metric has a documented formula in [docs/metrics.md](docs/metrics.md). It
+never scores developer productivity or code quality.
 
 ## Architecture
 
@@ -19,16 +20,17 @@ React + TypeScript (Vite)  ──HTTP/JSON──▶  Spring Boot backend  ──
 ```
 
 - `backend/`: Java 21+, Spring Boot 4, Maven. Owns all GitHub communication, the token,
-  pagination, rate-limit handling and (later) analytics and caching.
+  pagination, rate-limit handling, caching (Caffeine) and analytics. Analyzers in
+  `analysis/` are plain Java with no Spring or HTTP dependencies, so every formula is unit-tested.
 - `frontend/`: React 19 + TypeScript + Vite. Talks only to the backend.
 
 ## Prerequisites
 
-| Tool    | Version                                               |
-| ------- | ----------------------------------------------------- |
-| JDK     | 21 or newer                                           |
-| Node.js | 24 (LTS) or newer, with npm                           |
-| Maven   | not required: use the included wrapper (`./mvnw`)    |
+| Tool    | Version                                           |
+| ------- | ------------------------------------------------- |
+| JDK     | 21 or newer                                       |
+| Node.js | 24 (LTS) or newer, with npm                       |
+| Maven   | not required: use the included wrapper (`./mvnw`) |
 
 ## Quick start
 
@@ -62,17 +64,29 @@ Use a **fine-grained, read-only, public-repositories** token. Never commit it.
 
 ## API (so far)
 
-| Method | Path                 | Description                                   |
-| ------ | -------------------- | --------------------------------------------- |
-| GET    | `/actuator/health`   | Liveness: `{"status":"UP"}`                   |
-| GET    | `/api/v1/rate-limit` | Remaining GitHub quota (core and search APIs) |
+| Method | Path                                               | Description                                       |
+| ------ | -------------------------------------------------- | ------------------------------------------------- |
+| GET    | `/actuator/health`                                 | Liveness: `{"status":"UP"}`                       |
+| GET    | `/api/v1/rate-limit`                               | Remaining GitHub quota (core and search APIs)     |
+| GET    | `/api/v1/repositories/{owner}/{repo}`              | Repository metadata                               |
+| GET    | `/api/v1/repositories/{owner}/{repo}/languages`    | Language breakdown                                |
+| GET    | `/api/v1/repositories/{owner}/{repo}/commits`      | Commit activity (`since`, `until`, `excludeBots`) |
+| GET    | `/api/v1/repositories/{owner}/{repo}/contributors` | Contributor distribution and line changes         |
+
+Full reference with examples: [docs/api.md](docs/api.md). Metric definitions:
+[docs/metrics.md](docs/metrics.md).
 
 Errors use [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) problem details with a stable
 `code` field, e.g.:
 
 ```json
-{ "status": 429, "title": "Too Many Requests", "code": "RATE_LIMITED",
-  "detail": "GitHub API rate limit reached. ...", "resetAt": "2026-09-25T10:00:00Z" }
+{
+  "status": 429,
+  "title": "Too Many Requests",
+  "code": "RATE_LIMITED",
+  "detail": "GitHub API rate limit reached. ...",
+  "resetAt": "2026-09-25T10:00:00Z"
+}
 ```
 
 ## Testing
@@ -87,7 +101,7 @@ Formatting: `./mvnw spotless:apply` (Java, google-java-format) and `npm run form
 ## Roadmap
 
 1. ✅ Project foundation: backend, frontend, GitHub client, health, CI
-2. Repository analysis: metadata, commits, contributors, languages
+2. ✅ Repository analysis: metadata, commits, contributors, languages
 3. Dashboard: charts and responsive layout
 4. Pull request and issue analytics
 5. File activity, repository comparison, profile analysis, caching
@@ -99,6 +113,10 @@ Formatting: `./mvnw spotless:apply` (Java, google-java-format) and `npm run form
 - Public repositories only. GitHub returns 404 for private repositories, so "private" and
   "not found" look the same.
 - Without a token, the 60 requests/hour limit is enough for only a few analyses.
+- Commit analytics cover the default branch and at most 1,000 commits per window; larger windows
+  are shortened and flagged (`meta.truncated`). Times are grouped in UTC.
+- Line statistics come from GitHub and may be pending, missing for 10,000+-commit repositories,
+  and exclude merge commits. See [docs/metrics.md](docs/metrics.md).
 
 ## License
 

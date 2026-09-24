@@ -1,0 +1,13 @@
+[
+  {
+    "sha": "ccccccc3333333333333333333333333333333333",
+    "html_url": "https://github.com/octocat/Hello-World/commit/ccccccc3",
+    "commit": {
+      "author": { "name": "Dependabot", "email": "bot@example.com", "date": "2026-09-10T00:00:00Z" },
+      "committer": { "name": "GitHub", "email": "noreply@github.com", "date": "2026-09-10T00:00:00Z" },
+      "message": "Bump library from 1.0 to 1.1"
+    },
+    "author": { "login": "dependabot[bot]", "id": 49699333, "type": "Bot", "avatar_url": "a", "html_url": "h" },
+    "parents": [{ "sha": "p4" }]
+  }
+]
