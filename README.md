@@ -3,18 +3,23 @@
 **GitHub repository & commit analyzer.** GitPulse turns public GitHub activity (commits,
 contributors, languages, pull requests, issues) into factual, descriptive analytics.
 
-> **Status: early development (Phase 3 – dashboard).** Enter a repository to see its overview,
-> commit activity (weekly chart, weekday × hour heatmap, authors, quiet periods), contributors
-> and languages. Pull request and issue analytics come next; see [Roadmap](#roadmap).
+> **Status: early development (Phase 4 – pull requests and issues).** Enter a repository to see
+> its overview, recent activity, commits, pull requests, issues, contributors and languages.
+> Repository comparison and file activity come next; see [Roadmap](#roadmap).
 
 <!-- Screenshots: add docs/screenshots/dashboard.png once the repository is published. -->
 
 ## Features
 
 - **Overview:** stars, forks, watchers, open issues + PRs, license, dates, size.
+- **Recent activity:** last commit, commits in the last 30/90 days, active weeks, pull requests
+  and issues opened/merged/closed in the last 90 days. Plain counts; no "health score".
 - **Commit activity** for the last 30 days, 90 days or year: commits per week, when commits
   happen (weekday × UTC hour), most active authors, periods of inactivity, recent commits, with
   an option to exclude bots.
+- **Pull requests and issues** for the same period: opened vs merged/closed per week, median
+  and 90th-percentile time to merge/close, close reasons, most active authors, and all-time
+  totals (pull requests are never counted as issues).
 - **Contributors:** commit shares, how many people account for half of all commits, and lines
   added/deleted where GitHub provides them.
 - **Languages:** share of code by size.
@@ -79,14 +84,17 @@ Use a **fine-grained, read-only, public-repositories** token. Never commit it.
 
 ## API (so far)
 
-| Method | Path                                               | Description                                       |
-| ------ | -------------------------------------------------- | ------------------------------------------------- |
-| GET    | `/actuator/health`                                 | Liveness: `{"status":"UP"}`                       |
-| GET    | `/api/v1/rate-limit`                               | Remaining GitHub quota (core and search APIs)     |
-| GET    | `/api/v1/repositories/{owner}/{repo}`              | Repository metadata                               |
-| GET    | `/api/v1/repositories/{owner}/{repo}/languages`    | Language breakdown                                |
-| GET    | `/api/v1/repositories/{owner}/{repo}/commits`      | Commit activity (`since`, `until`, `excludeBots`) |
-| GET    | `/api/v1/repositories/{owner}/{repo}/contributors` | Contributor distribution and line changes         |
+| Method | Path                                                | Description                                       |
+| ------ | --------------------------------------------------- | ------------------------------------------------- |
+| GET    | `/actuator/health`                                  | Liveness: `{"status":"UP"}`                       |
+| GET    | `/api/v1/rate-limit`                                | Remaining GitHub quota (core and search APIs)     |
+| GET    | `/api/v1/repositories/{owner}/{repo}`               | Repository metadata                               |
+| GET    | `/api/v1/repositories/{owner}/{repo}/languages`     | Language breakdown                                |
+| GET    | `/api/v1/repositories/{owner}/{repo}/commits`       | Commit activity (`since`, `until`, `excludeBots`) |
+| GET    | `/api/v1/repositories/{owner}/{repo}/contributors`  | Contributor distribution and line changes         |
+| GET    | `/api/v1/repositories/{owner}/{repo}/pull-requests` | Pull request activity + all-time totals           |
+| GET    | `/api/v1/repositories/{owner}/{repo}/issues`        | Issue activity + all-time totals (PRs excluded)   |
+| GET    | `/api/v1/repositories/{owner}/{repo}/activity`      | Recent-activity indicators (30/90 days)           |
 
 Full reference with examples: [docs/api.md](docs/api.md). Metric definitions:
 [docs/metrics.md](docs/metrics.md).
@@ -118,7 +126,7 @@ Formatting: `./mvnw spotless:apply` (Java, google-java-format) and `npm run form
 1. ✅ Project foundation: backend, frontend, GitHub client, health, CI
 2. ✅ Repository analysis: metadata, commits, contributors, languages
 3. ✅ Dashboard: charts and responsive layout
-4. Pull request and issue analytics
+4. ✅ Pull request and issue analytics, recent activity, rate-limit handling
 5. File activity, repository comparison, profile analysis, caching
 6. Export (CSV/JSON) and full open-source documentation
 7. Optional AI features (evaluated, not assumed)
@@ -132,6 +140,9 @@ Formatting: `./mvnw spotless:apply` (Java, google-java-format) and `npm run form
   are shortened and flagged (`meta.truncated`). Times are grouped in UTC.
 - Line statistics come from GitHub and may be pending, missing for 10,000+-commit repositories,
   and exclude merge commits. See [docs/metrics.md](docs/metrics.md).
+- Pull request and issue statistics use at most 500 items per window (flagged when shortened).
+  All-time merged and closed-issue counts use GitHub's Search API and show "Unavailable" when
+  its separate rate limit is reached.
 
 ## License
 

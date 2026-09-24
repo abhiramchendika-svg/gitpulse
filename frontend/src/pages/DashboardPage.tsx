@@ -1,19 +1,25 @@
 import type { ReactNode } from 'react'
+import { ActivitySection } from '../components/ActivitySection'
 import { Card } from '../components/Card'
 import { CommitActivitySection } from '../components/CommitActivitySection'
 import { ContributorsSection } from '../components/ContributorsSection'
 import { ErrorNotice } from '../components/ErrorNotice'
 import { FilterBar } from '../components/FilterBar'
+import { IssuesSection } from '../components/IssuesSection'
 import { LanguagesSection } from '../components/LanguagesSection'
 import { OverviewSection } from '../components/OverviewSection'
+import { PullRequestsSection } from '../components/PullRequestsSection'
 import { useAsync, type AsyncState } from '../hooks/useAsync'
 import { usePendingRetry } from '../hooks/usePendingRetry'
 import { rangeToSince, type Range } from '../hooks/useUrlState'
 import {
+  fetchActivity,
   fetchCommits,
   fetchContributors,
+  fetchIssues,
   fetchLanguages,
   fetchOverview,
+  fetchPullRequests,
 } from '../services/repositoryService'
 import { formatRepo, type RepoRef } from '../utils/parseRepoInput'
 import styles from './DashboardPage.module.css'
@@ -40,6 +46,14 @@ export function DashboardPage({ repo, range, excludeBots, onFiltersChange }: Das
     fetchCommits(repo, { since, excludeBots }, signal),
   )
   const contributors = useAsync(gate, repoKey, (signal) => fetchContributors(repo, signal))
+  const pullRequests = useAsync(gate && `${gate}|${since}|${excludeBots}`, repoKey, (signal) =>
+    fetchPullRequests(repo, { since, excludeBots }, signal),
+  )
+  const issues = useAsync(gate && `${gate}|${since}|${excludeBots}`, repoKey, (signal) =>
+    fetchIssues(repo, { since, excludeBots }, signal),
+  )
+  // Activity reuses the backend's cached default-window data, so it is effectively free.
+  const activity = useAsync(gate, repoKey, (signal) => fetchActivity(repo, signal))
 
   const linesPending = contributors.data?.statistics.lineStatsStatus === 'PENDING'
   const gaveUp = usePendingRetry(linesPending, contributors.loading, contributors.reload, repoKey)
@@ -60,14 +74,25 @@ export function DashboardPage({ repo, range, excludeBots, onFiltersChange }: Das
         <Placeholder title="Repository overview" />
       )}
 
+      {overview.data &&
+        render(activity, 'Recent activity', (data) => <ActivitySection data={data} />)}
+
       <section className={styles.group} aria-labelledby="activity-heading">
         <div className={styles.groupHeader}>
-          <h2 id="activity-heading">Commit activity</h2>
+          <h2 id="activity-heading">Activity in the selected period</h2>
           <FilterBar range={range} excludeBots={excludeBots} onChange={onFiltersChange} />
         </div>
         {render(commits, 'Commit activity', (data, stale) => (
           <CommitActivitySection data={data} stale={stale} />
         ))}
+        <div className={styles.workItems}>
+          {render(pullRequests, 'Pull requests', (data, stale) => (
+            <PullRequestsSection data={data} stale={stale} />
+          ))}
+          {render(issues, 'Issues', (data, stale) => (
+            <IssuesSection data={data} stale={stale} />
+          ))}
+        </div>
       </section>
 
       <section className={styles.group} aria-labelledby="alltime-heading">

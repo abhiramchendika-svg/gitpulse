@@ -7,12 +7,15 @@ import type { ProblemDetail } from '../types/api'
 export class ApiError extends Error {
   readonly status: number
   readonly code: string
+  /** For RATE_LIMITED: when GitHub's limit resets (ISO instant), if the backend knows. */
+  readonly resetAt?: string
 
-  constructor(status: number, code: string, message: string) {
+  constructor(status: number, code: string, message: string, resetAt?: string) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.code = code
+    this.resetAt = resetAt
   }
 }
 
@@ -42,6 +45,7 @@ async function toApiError(response: Response): Promise<ApiError> {
       response.status,
       problem.code ?? 'UNKNOWN_ERROR',
       problem.detail ?? problem.title ?? fallback,
+      problem.resetAt,
     )
   } catch {
     // Not JSON. A bare 502/503/504 comes from a proxy (e.g. Vite in dev) that cannot reach the

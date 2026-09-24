@@ -31,7 +31,8 @@ public record RepositoryOverviewResponse(
     int sizeKb,
     String defaultBranch,
     boolean archived,
-    boolean fork) {
+    boolean fork,
+    boolean hasIssues) {
 
   public record Owner(String login, String type, String avatarUrl, String htmlUrl) {}
 

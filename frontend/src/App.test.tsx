@@ -1,7 +1,7 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { StrictMode } from 'react'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeAll, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import * as fx from './test/fixtures'
 
@@ -26,7 +26,14 @@ function mockBackend(route: Route) {
 
 const REPO_BASE = '/api/v1/repositories/octocat/hello-world'
 
-function happyRoutes(overrides: { contributors?: () => Response } = {}): Route {
+interface RouteOverrides {
+  contributors?: () => Response
+  pullRequests?: () => Response
+  issues?: () => Response
+  activity?: () => Response
+}
+
+function happyRoutes(overrides: RouteOverrides = {}): Route {
   return (url) => {
     switch (url.pathname) {
       case REPO_BASE:
@@ -37,6 +44,12 @@ function happyRoutes(overrides: { contributors?: () => Response } = {}): Route {
         return Response.json(fx.commits())
       case `${REPO_BASE}/contributors`:
         return overrides.contributors?.() ?? Response.json(fx.contributors())
+      case `${REPO_BASE}/pull-requests`:
+        return overrides.pullRequests?.() ?? Response.json(fx.pullRequests())
+      case `${REPO_BASE}/issues`:
+        return overrides.issues?.() ?? Response.json(fx.issues())
+      case `${REPO_BASE}/activity`:
+        return overrides.activity?.() ?? Response.json(fx.activity())
     }
   }
 }
@@ -51,6 +64,12 @@ async function analyse(text: string) {
 }
 
 describe('App', () => {
+  // The dashboard is lazy-loaded. Import it once up front so the first test that opens it is not
+  // measuring module transformation time against Testing Library's 1s wait.
+  beforeAll(async () => {
+    await import('./pages/DashboardPage')
+  })
+
   it('shows the landing page with backend status before a repository is chosen', async () => {
     mockBackend(() => undefined)
 
@@ -132,9 +151,92 @@ describe('App', () => {
       expect(last).toContain('excludeBots=true')
     })
     expect(window.location.search).toBe('?repo=octocat%2Fhello-world&range=30d&bots=exclude')
-    // Contributors and languages are all-time: not refetched for a new window.
+    // The same filter applies to pull requests and issues...
+    expect(requested(fetchMock, '/pull-requests').at(-1)).toContain('excludeBots=true')
+    expect(requested(fetchMock, '/issues').at(-1)).toContain('excludeBots=true')
+    // ...but all-time sections and the fixed 90-day activity summary are not refetched.
     expect(requested(fetchMock, '/contributors')).toHaveLength(1)
     expect(requested(fetchMock, '/languages')).toHaveLength(1)
+    expect(requested(fetchMock, '/activity')).toHaveLength(1)
+  })
+
+  it('shows pull requests, issues and recent activity', async () => {
+    mockBackend(happyRoutes())
+    render(<App />)
+
+    await analyse('octocat/hello-world')
+
+    // Wait for real content: the loading placeholder card has the same title.
+    await screen.findByRole('link', { name: /#42 Speed up the build/ })
+    const prs = screen.getByRole('region', { name: 'Pull requests' })
+    expect(within(prs).getByText('80')).toBeInTheDocument() // merged, all time
+    expect(within(prs).getByText('30 hours')).toBeInTheDocument() // median time to merge
+    expect(within(prs).getByRole('list', { name: 'Legend' })).toHaveTextContent('Opened (3)')
+
+    await screen.findByRole('link', { name: /#43 Crash on startup/ })
+    const issues = screen.getByRole('region', { name: 'Issues' })
+    expect(within(issues).getByText('6')).toBeInTheDocument() // open now
+    expect(within(issues).getByText(/of 1 closed/i)).toHaveTextContent('1 completed')
+
+    await screen.findByText('4 of 12')
+    expect(screen.getByRole('region', { name: 'Recent activity' })).toHaveTextContent(
+      'Commits, 30 days',
+    )
+  })
+
+  it('shows "Unavailable" instead of 0 when the Search API count is missing', async () => {
+    mockBackend(happyRoutes({ pullRequests: () => Response.json(fx.pullRequests(null)) }))
+    render(<App />)
+
+    await analyse('octocat/hello-world')
+
+    await screen.findByRole('link', { name: /#42 Speed up the build/ })
+    const prs = screen.getByRole('region', { name: 'Pull requests' })
+    expect(within(prs).getByText('Unavailable')).toBeInTheDocument()
+    expect(within(prs).queryByText('0')).not.toBeInTheDocument()
+  })
+
+  it('explains when a repository has issues turned off', async () => {
+    mockBackend(happyRoutes({ issues: () => Response.json(fx.issues(false)) }))
+    render(<App />)
+
+    await analyse('octocat/hello-world')
+
+    expect(await screen.findByText('This repository has GitHub Issues turned off.')).toBeVisible()
+  })
+
+  it('marks lower-bound activity counts with +', async () => {
+    mockBackend(happyRoutes({ activity: () => Response.json(fx.activity(true)) }))
+    render(<App />)
+
+    await analyse('octocat/hello-world')
+
+    expect(await screen.findByText('5+')).toBeInTheDocument()
+    const activity = screen.getByRole('region', { name: 'Recent activity' })
+    expect(within(activity).getByText(/\+ means at least/)).toBeInTheDocument()
+  })
+
+  it('keeps other sections working when one endpoint is rate limited', async () => {
+    mockBackend(
+      happyRoutes({
+        pullRequests: () =>
+          Response.json(
+            { status: 429, code: 'RATE_LIMITED', detail: 'rate limited' },
+            { status: 429 },
+          ),
+      }),
+    )
+    render(<App />)
+
+    await analyse('octocat/hello-world')
+
+    await screen.findByText(/rate limit reached/)
+    const prCard = screen.getByRole('region', { name: 'Pull requests' })
+    expect(within(prCard).getByRole('alert')).toHaveTextContent('rate limit reached')
+    expect(within(prCard).getByRole('button', { name: 'Try again' })).toBeInTheDocument()
+    // Everything else still renders.
+    expect(await screen.findByRole('region', { name: 'Issues' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Commits per week' })).toBeInTheDocument()
   })
 
   it('explains when GitHub is still computing line statistics', async () => {

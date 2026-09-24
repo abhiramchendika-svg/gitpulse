@@ -46,12 +46,19 @@ GitHub data is cached in memory for 10 minutes, so repeated requests (including 
 parameters over the same data, e.g. `excludeBots`) cost no GitHub quota. Approximate GitHub
 requests on a cold cache:
 
-| Endpoint     | GitHub requests                                                     |
-| ------------ | ------------------------------------------------------------------- |
-| overview     | 1                                                                   |
-| languages    | 1                                                                   |
-| commits      | 1 per 100 commits in the window (max 10) + 1 for the all-time count |
-| contributors | 1 per 100 contributors (max 5) + 1 for line statistics              |
+| Endpoint      | GitHub requests                                                                |
+| ------------- | ------------------------------------------------------------------------------ |
+| overview      | 1                                                                              |
+| languages     | 1                                                                              |
+| commits       | 1 per 100 commits in the window (max 10) + 1 for the all-time count            |
+| contributors  | 1 per 100 contributors (max 5) + 1 for line statistics                         |
+| pull-requests | 1 per 100 pull requests (max 5, stops early) + 2 counts + 1 Search API request |
+| issues        | 1 per 100 issues and PRs (max 5, stops early) + 1 count + 1 Search API request |
+| activity      | usually 0: it reuses the cached default-window data                            |
+
+The Search API has its own, smaller limit (10 requests/minute anonymous, 30 with a token). When it
+is exhausted, counts that depend on it are returned as `null` and the rest of the response is
+unaffected.
 
 ---
 
@@ -115,7 +122,8 @@ curl http://localhost:8080/api/v1/repositories/spring-projects/spring-petclinic
   "sizeKb": 9000,
   "defaultBranch": "main",
   "archived": false,
-  "fork": false
+  "fork": false,
+  "hasIssues": true
 }
 ```
 
@@ -271,3 +279,115 @@ All-time contributors with linked GitHub accounts (top 100 listed; totals cover 
 ```
 
 When `lineStatsStatus` is `PENDING`, call again after a few seconds. Errors: `400`, `404`, `429`, `503`.
+
+## `GET /api/v1/repositories/{owner}/{repo}/pull-requests`
+
+Same query parameters as `/commits` (`since`, `until`, `excludeBots`). Statistics describe pull
+requests **opened** in the window; totals are all-time.
+
+```json
+{
+  "repository": "spring-projects/spring-petclinic",
+  "meta": {
+    "since": "2025-12-05T10:12:26Z",
+    "requestedSince": "2025-09-25T00:00:00Z",
+    "sampleSize": 500,
+    "truncated": true
+  },
+  "totals": {
+    "open": 4,
+    "closed": 2269,
+    "merged": 205,
+    "closedWithoutMerge": 2064
+  },
+  "statistics": {
+    "opened": 500,
+    "merged": 19,
+    "closedWithoutMerge": 477,
+    "stillOpen": 4,
+    "openedByBots": 0,
+    "mergedPercentOfClosed": 3.8,
+    "timeToMerge": { "count": 19, "medianHours": 165.5, "p90Hours": 760.6 },
+    "weekly": [{ "weekStart": "2025-12-01", "opened": 4, "merged": 0 }],
+    "topAuthors": [{ "login": "Gopikatla", "bot": false, "count": 8 }],
+    "recent": [
+      {
+        "number": 2669,
+        "title": "…",
+        "authorLogin": "…",
+        "draft": false,
+        "createdAt": "…",
+        "status": "closed",
+        "htmlUrl": "…"
+      }
+    ]
+  }
+}
+```
+
+(`meta` abridged.) `totals.merged` and `totals.closedWithoutMerge` are `null` when GitHub's Search
+API is rate limited; the response is still `200`. Errors: `400`, `404`, `429`, `503`.
+
+## `GET /api/v1/repositories/{owner}/{repo}/issues`
+
+Same parameters. Pull requests are excluded.
+
+```json
+{
+  "repository": "spring-projects/spring-petclinic",
+  "issuesEnabled": true,
+  "totals": { "open": 0, "closed": 392 },
+  "statistics": {
+    "opened": 23,
+    "closed": 23,
+    "stillOpen": 0,
+    "openedByBots": 0,
+    "closedAsCompleted": 22,
+    "closedAsNotPlanned": 1,
+    "closedOther": 0,
+    "timeToClose": { "count": 23, "medianHours": 54.2, "p90Hours": 1312.2 },
+    "weekly": [{ "weekStart": "2025-12-15", "opened": 1, "closed": 1 }],
+    "topOpeners": [{ "login": "…", "bot": false, "count": 2 }],
+    "recent": [
+      {
+        "number": 2600,
+        "title": "…",
+        "authorLogin": "…",
+        "createdAt": "…",
+        "open": false,
+        "comments": 3,
+        "htmlUrl": "…"
+      }
+    ]
+  }
+}
+```
+
+(`meta` omitted.) With Issues turned off: `"issuesEnabled": false, "totals": null,
+"statistics": null`. `totals.closed` is `null` when the Search API is rate limited.
+
+## `GET /api/v1/repositories/{owner}/{repo}/activity`
+
+No parameters. Factual indicators for the last 30/90 days; there is no score.
+
+```json
+{
+  "repository": "spring-projects/spring-petclinic",
+  "generatedAt": "2026-09-24T19:56:23Z",
+  "indicators": {
+    "lastCommitAt": "2026-08-19T13:20:54Z",
+    "daysSinceLastCommit": 36.3,
+    "lastPushAt": "2026-08-26T10:57:55Z",
+    "commitsLast30Days": 0,
+    "commitsLast90Days": 8,
+    "activeWeeksOfLast12": 5,
+    "commitsPartial": false,
+    "pullRequestsOpenedLast90Days": 114,
+    "pullRequestsMergedLast90Days": 8,
+    "pullRequestsPartial": false,
+    "issuesOpenedLast90Days": 5,
+    "issuesClosedLast90Days": 5,
+    "issuesPartial": false
+  }
+}
+```

@@ -3,6 +3,8 @@ package io.github.abhiramchendika.gitpulse.service;
 import io.github.abhiramchendika.gitpulse.analysis.model.CommitRecord;
 import io.github.abhiramchendika.gitpulse.analysis.model.ContributorLineStats;
 import io.github.abhiramchendika.gitpulse.analysis.model.ContributorRecord;
+import io.github.abhiramchendika.gitpulse.analysis.model.IssueRecord;
+import io.github.abhiramchendika.gitpulse.analysis.model.PullRequestRecord;
 import io.github.abhiramchendika.gitpulse.config.AnalysisProperties;
 import io.github.abhiramchendika.gitpulse.github.GitHubClient;
 import io.github.abhiramchendika.gitpulse.github.PagedResult;
@@ -10,12 +12,17 @@ import io.github.abhiramchendika.gitpulse.github.StatsResult;
 import io.github.abhiramchendika.gitpulse.github.exception.GitHubApiException;
 import io.github.abhiramchendika.gitpulse.github.exception.GitHubEmptyRepositoryException;
 import io.github.abhiramchendika.gitpulse.github.exception.GitHubNotFoundException;
+import io.github.abhiramchendika.gitpulse.github.exception.GitHubRateLimitException;
 import io.github.abhiramchendika.gitpulse.github.model.GitHubCommit;
 import io.github.abhiramchendika.gitpulse.github.model.GitHubContributor;
 import io.github.abhiramchendika.gitpulse.github.model.GitHubContributorStats;
+import io.github.abhiramchendika.gitpulse.github.model.GitHubIssue;
+import io.github.abhiramchendika.gitpulse.github.model.GitHubPullRequest;
 import io.github.abhiramchendika.gitpulse.github.model.GitHubRepository;
+import io.github.abhiramchendika.gitpulse.github.model.GitHubSearchResult;
 import io.github.abhiramchendika.gitpulse.github.model.GitHubUser;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -145,6 +152,102 @@ public class RepositoryDataService {
         .toList();
   }
 
+  /** Pull requests created since {@code since}, newest first (early-stopping pagination). */
+  @Cacheable("pullRequests")
+  public PullRequestSample pullRequests(RepositoryRef ref, Instant since) {
+    PagedResult<GitHubPullRequest> page =
+        onRepository(
+            ref,
+            () ->
+                gitHubClient.listPullRequests(
+                    ref.owner(), ref.repo(), since, properties.maxPullRequestPages()));
+    return new PullRequestSample(
+        page.items().stream()
+            .filter(pr -> pr.createdAt() != null)
+            .map(RepositoryDataService::toPullRequestRecord)
+            .toList(),
+        page.truncated());
+  }
+
+  /** Issues created since {@code since}; pull requests mixed into the endpoint are removed. */
+  @Cacheable("issues")
+  public IssueSample issues(RepositoryRef ref, Instant since) {
+    PagedResult<GitHubIssue> page =
+        onRepository(
+            ref,
+            () ->
+                gitHubClient.listIssues(
+                    ref.owner(), ref.repo(), since, properties.maxIssuePages()));
+    Instant oldest =
+        page.items().stream()
+            .map(GitHubIssue::createdAt)
+            .filter(Objects::nonNull)
+            .min(Comparator.naturalOrder())
+            .orElse(null);
+    return new IssueSample(
+        page.items().stream()
+            .filter(i -> !i.isPullRequest() && i.createdAt() != null)
+            .map(RepositoryDataService::toIssueRecord)
+            .toList(),
+        oldest,
+        page.truncated());
+  }
+
+  // The count methods share one cache. Spring's default key is only the method arguments, which
+  // would make openPullRequestCount(ref) and closedPullRequestCount(ref) collide, so the method
+  // name is part of every key.
+
+  @Cacheable(value = "counts", key = "{#root.methodName, #ref}")
+  public long openPullRequestCount(RepositoryRef ref) {
+    return onRepository(ref, () -> gitHubClient.countPullRequests(ref.owner(), ref.repo(), "open"));
+  }
+
+  /** Includes merged pull requests. */
+  @Cacheable(value = "counts", key = "{#root.methodName, #ref}")
+  public long closedPullRequestCount(RepositoryRef ref) {
+    return onRepository(
+        ref, () -> gitHubClient.countPullRequests(ref.owner(), ref.repo(), "closed"));
+  }
+
+  /**
+   * All-time merged pull requests via the Search API (the pulls endpoint cannot filter by merged).
+   * Null, and not cached, when unavailable; see {@link #searchCount}.
+   */
+  @Cacheable(value = "counts", key = "{#root.methodName, #ref}", unless = "#result == null")
+  public Long mergedPullRequestCount(RepositoryRef ref) {
+    return searchCount(ref, "is:pr is:merged");
+  }
+
+  /**
+   * All-time closed issues (pull requests excluded) via the Search API. The issues list cannot be
+   * counted with the per_page=1 trick: it uses cursor pagination and reports no last page.
+   */
+  @Cacheable(value = "counts", key = "{#root.methodName, #ref}", unless = "#result == null")
+  public Long closedIssueCount(RepositoryRef ref) {
+    return searchCount(ref, "is:issue is:closed");
+  }
+
+  /**
+   * Counts search matches within one repository. Returns null when the separate, much smaller
+   * Search quota is exhausted or GitHub reports an incomplete (timed-out) count: callers show
+   * "unavailable" instead of failing the whole response or showing a too-low number.
+   */
+  private Long searchCount(RepositoryRef ref, String qualifiers) {
+    try {
+      GitHubSearchResult result =
+          gitHubClient.searchIssueCount(
+              "repo:" + ref.owner() + "/" + ref.repo() + " " + qualifiers);
+      if (result.incompleteResults()) {
+        log.info("Search count '{}' for {} was incomplete", qualifiers, ref.fullName());
+        return null;
+      }
+      return result.totalCount();
+    } catch (GitHubRateLimitException e) {
+      log.info("Search API rate limit reached; count '{}' unavailable", qualifiers);
+      return null;
+    }
+  }
+
   /** Translates "404 from GitHub" into the domain meaning "this repository does not exist". */
   private static <T> T onRepository(RepositoryRef ref, Supplier<T> call) {
     try {
@@ -179,6 +282,34 @@ public class RepositoryDataService {
         account != null && isBot(login, account.type()),
         headline(details.message()),
         commit.htmlUrl());
+  }
+
+  static PullRequestRecord toPullRequestRecord(GitHubPullRequest pr) {
+    String login = pr.user() == null ? null : pr.user().login();
+    return new PullRequestRecord(
+        pr.number(),
+        headline(pr.title()),
+        login,
+        pr.user() != null && isBot(login, pr.user().type()),
+        pr.draft(),
+        pr.createdAt(),
+        pr.closedAt(),
+        pr.mergedAt(),
+        pr.htmlUrl());
+  }
+
+  static IssueRecord toIssueRecord(GitHubIssue issue) {
+    String login = issue.user() == null ? null : issue.user().login();
+    return new IssueRecord(
+        issue.number(),
+        headline(issue.title()),
+        login,
+        issue.user() != null && isBot(login, issue.user().type()),
+        issue.createdAt(),
+        issue.closedAt(),
+        issue.stateReason(),
+        issue.comments(),
+        issue.htmlUrl());
   }
 
   static boolean isBot(String login, String type) {

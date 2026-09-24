@@ -57,6 +57,7 @@ public class RepositoryService {
         repo.size(),
         repo.defaultBranch(),
         repo.archived(),
-        repo.fork());
+        repo.fork(),
+        repo.issuesEnabled());
   }
 }

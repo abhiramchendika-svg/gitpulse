@@ -30,6 +30,19 @@ describe('getJson', () => {
     })
   })
 
+  it('keeps the reset time of a rate limit', async () => {
+    mockFetch(async () =>
+      Response.json(
+        { status: 429, code: 'RATE_LIMITED', detail: 'x', resetAt: '2026-09-25T10:30:00Z' },
+        { status: 429 },
+      ),
+    )
+
+    await expect(getJson('/api/v1/rate-limit')).rejects.toMatchObject({
+      resetAt: '2026-09-25T10:30:00Z',
+    })
+  })
+
   it('reports a non-JSON 502 (proxy cannot reach backend) as BACKEND_UNREACHABLE', async () => {
     mockFetch(async () => new Response('Bad Gateway', { status: 502 }))
 

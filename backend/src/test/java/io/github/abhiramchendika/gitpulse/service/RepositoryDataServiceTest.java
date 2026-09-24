@@ -34,7 +34,8 @@ class RepositoryDataServiceTest {
   private final GitHubClient client = mock(GitHubClient.class);
   private final RepositoryDataService service =
       new RepositoryDataService(
-          client, new AnalysisProperties(10, 5, 365, 3650, Duration.ofDays(14), 10, 10, 10, 100));
+          client,
+          new AnalysisProperties(10, 5, 365, 3650, Duration.ofDays(14), 10, 10, 10, 100, 5, 5));
 
   private static GitHubCommit commit(
       GitHubUser account, String gitName, String message, int parents) {

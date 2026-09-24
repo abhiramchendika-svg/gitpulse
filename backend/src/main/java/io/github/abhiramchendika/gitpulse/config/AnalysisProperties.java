@@ -20,6 +20,8 @@ import org.springframework.validation.annotation.Validated;
  * @param recentCommits recent commits listed in commit analytics
  * @param inactivityPeriods inactivity periods listed (the longest ones)
  * @param contributorLimit contributors listed in contributor analytics
+ * @param maxPullRequestPages cap on pull request pages (100 each) fetched per window
+ * @param maxIssuePages cap on issue pages (100 each, pull requests included) fetched per window
  */
 @Validated
 @ConfigurationProperties(prefix = "gitpulse.analysis")
@@ -32,4 +34,6 @@ public record AnalysisProperties(
     @Min(1) int topAuthors,
     @Min(1) int recentCommits,
     @Min(1) int inactivityPeriods,
-    @Min(1) int contributorLimit) {}
+    @Min(1) int contributorLimit,
+    @Min(1) @Max(10) int maxPullRequestPages,
+    @Min(1) @Max(10) int maxIssuePages) {}

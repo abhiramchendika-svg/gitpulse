@@ -1,0 +1,91 @@
+/* Shared by the pull request and issue sections. */
+.stack {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: 1rem;
+}
+
+.subheading {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.items li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0 0.5rem;
+  min-width: 0;
+}
+
+.title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta {
+  grid-column: 2;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+/* Status is always written out as text; the border only reinforces it. */
+.status {
+  align-self: start;
+  font-size: 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0 0.45rem;
+  color: var(--text-muted);
+  text-transform: lowercase;
+}
+
+.merged {
+  border-color: var(--series-1);
+}
+
+.open {
+  border-color: var(--success);
+}
+
+.closed {
+  border-color: var(--border);
+}
+
+.tag {
+  margin-left: 0.4rem;
+  font-size: 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0 0.4rem;
+  color: var(--text-muted);
+}
+
+.reasons {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.empty {
+  margin: 0;
+  color: var(--text-muted);
+}

@@ -28,7 +28,17 @@ public record GitHubRepository(
     int size,
     @JsonProperty("default_branch") String defaultBranch,
     boolean archived,
-    boolean fork) {
+    boolean fork,
+    /**
+     * False when the repository has the Issues feature turned off. Boxed on purpose: Jackson 3
+     * rejects a missing value for a primitive, and "missing" must not silently mean "disabled".
+     */
+    @JsonProperty("has_issues") Boolean hasIssues) {
+
+  /** Issues are enabled unless GitHub explicitly says otherwise (enabled is GitHub's default). */
+  public boolean issuesEnabled() {
+    return hasIssues == null || hasIssues;
+  }
 
   public record License(@JsonProperty("spdx_id") String spdxId, String name) {}
 }

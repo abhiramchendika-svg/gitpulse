@@ -3,6 +3,7 @@ import {
   formatCount,
   formatDate,
   formatDays,
+  formatHours,
   formatRelative,
   formatSizeKb,
   formatTime,
@@ -33,6 +34,14 @@ describe('formatRelative', () => {
     expect(formatRelative('2026-09-22T12:00:00Z', new Date('2026-09-25T12:00:00Z'))).toMatch(
       /3 days ago/,
     )
+  })
+})
+
+describe('formatHours', () => {
+  it('picks a readable unit', () => {
+    expect(formatHours(0.25)).toBe('15 min')
+    expect(formatHours(5.24)).toBe('5.2 hours')
+    expect(formatHours(165.5)).toBe('6.9 days')
   })
 })
 

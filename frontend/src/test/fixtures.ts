@@ -1,7 +1,10 @@
 import type {
+  ActivityResponse,
   CommitAnalyticsResponse,
   ContributorAnalyticsResponse,
+  IssueAnalyticsResponse,
   LanguageResponse,
+  PullRequestAnalyticsResponse,
   RateLimitResponse,
   RepositoryOverview,
 } from '../types/api'
@@ -33,6 +36,7 @@ export const overview: RepositoryOverview = {
   defaultBranch: 'main',
   archived: false,
   fork: false,
+  hasIssues: true,
 }
 
 export const languages: LanguageResponse = {
@@ -149,6 +153,119 @@ export function contributors(
           deletions: null,
         },
       ],
+    },
+  }
+}
+
+const meta = (overrides: Partial<CommitAnalyticsResponse['meta']> = {}) => ({
+  generatedAt: '2026-09-25T12:00:00Z',
+  since: '2025-09-26T00:00:00Z',
+  until: '2026-09-25T12:00:00Z',
+  requestedSince: '2025-09-26T00:00:00Z',
+  sampleSize: 3,
+  truncated: false,
+  botsExcluded: false,
+  timezone: 'UTC',
+  ...overrides,
+})
+
+export function pullRequests(merged: number | null = 80): PullRequestAnalyticsResponse {
+  return {
+    repository: 'octocat/hello-world',
+    meta: meta(),
+    totals: {
+      open: 4,
+      closed: 100,
+      merged,
+      closedWithoutMerge: merged === null ? null : 100 - merged,
+    },
+    statistics: {
+      opened: 3,
+      merged: 2,
+      closedWithoutMerge: 0,
+      stillOpen: 1,
+      openedByBots: 0,
+      mergedPercentOfClosed: 100,
+      timeToMerge: { count: 2, medianHours: 30, p90Hours: 70 },
+      weekly: [
+        { weekStart: '2026-09-07', opened: 2, merged: 1 },
+        { weekStart: '2026-09-14', opened: 1, merged: 1 },
+      ],
+      topAuthors: [{ login: 'mona', bot: false, count: 3 }],
+      recent: [
+        {
+          number: 42,
+          title: 'Speed up the build',
+          authorLogin: 'mona',
+          draft: false,
+          createdAt: '2026-09-14T00:00:00Z',
+          status: 'merged',
+          htmlUrl: 'https://github.com/octocat/hello-world/pull/42',
+        },
+      ],
+    },
+  }
+}
+
+export function issues(enabled = true): IssueAnalyticsResponse {
+  if (!enabled) {
+    return {
+      repository: 'octocat/hello-world',
+      meta: meta(),
+      issuesEnabled: false,
+      totals: null,
+      statistics: null,
+    }
+  }
+  return {
+    repository: 'octocat/hello-world',
+    meta: meta(),
+    issuesEnabled: true,
+    totals: { open: 6, closed: 50 },
+    statistics: {
+      opened: 2,
+      closed: 1,
+      stillOpen: 1,
+      openedByBots: 0,
+      closedAsCompleted: 1,
+      closedAsNotPlanned: 0,
+      closedOther: 0,
+      timeToClose: { count: 1, medianHours: 5, p90Hours: 5 },
+      weekly: [{ weekStart: '2026-09-14', opened: 2, closed: 1 }],
+      topOpeners: [{ login: 'hubot', bot: false, count: 2 }],
+      recent: [
+        {
+          number: 43,
+          title: 'Crash on startup',
+          authorLogin: 'hubot',
+          createdAt: '2026-09-15T00:00:00Z',
+          open: true,
+          comments: 1,
+          htmlUrl: 'https://github.com/octocat/hello-world/issues/43',
+        },
+      ],
+    },
+  }
+}
+
+export function activity(partial = false): ActivityResponse {
+  return {
+    repository: 'octocat/hello-world',
+    generatedAt: '2026-09-25T12:00:00Z',
+    indicators: {
+      lastCommitAt: '2026-09-20T10:00:00Z',
+      daysSinceLastCommit: 5.1,
+      lastPushAt: '2026-09-20T10:00:00Z',
+      commitsLast30Days: 5,
+      commitsLast90Days: 12,
+      activeWeeksOfLast12: 4,
+      commitsPartial: partial,
+      pullRequestsOpenedLast90Days: 3,
+      pullRequestsMergedLast90Days: 2,
+      pullRequestsPartial: false,
+      issuesOpenedLast90Days: 2,
+      issuesClosedLast90Days: 1,
+      issuesPartial: false,
     },
   }
 }

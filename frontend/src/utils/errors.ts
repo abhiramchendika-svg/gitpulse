@@ -1,12 +1,15 @@
 import type { ApiError } from '../services/apiClient'
+import { formatTime } from './format'
 
 /** Human explanation for each backend error code. */
 export function describeError(error: ApiError): string {
   switch (error.code) {
     case 'REPOSITORY_NOT_FOUND':
       return 'Repository not found. Check the name. Private repositories cannot be analysed and look the same as missing ones.'
-    case 'RATE_LIMITED':
-      return 'GitHub API rate limit reached. Wait for the limit to reset, or configure GITHUB_TOKEN on the backend for a higher limit.'
+    case 'RATE_LIMITED': {
+      const when = error.resetAt ? ` It resets at ${formatTime(error.resetAt)}.` : ''
+      return `GitHub API rate limit reached.${when} Configure GITHUB_TOKEN on the backend for a much higher limit.`
+    }
     case 'BACKEND_UNREACHABLE':
     case 'NETWORK_ERROR':
       return 'Could not reach the GitPulse backend. Is it running?'

@@ -10,8 +10,11 @@ import io.github.abhiramchendika.gitpulse.github.exception.GitHubUnavailableExce
 import io.github.abhiramchendika.gitpulse.github.model.GitHubCommit;
 import io.github.abhiramchendika.gitpulse.github.model.GitHubContributor;
 import io.github.abhiramchendika.gitpulse.github.model.GitHubContributorStats;
+import io.github.abhiramchendika.gitpulse.github.model.GitHubIssue;
+import io.github.abhiramchendika.gitpulse.github.model.GitHubPullRequest;
 import io.github.abhiramchendika.gitpulse.github.model.GitHubRateLimitResponse;
 import io.github.abhiramchendika.gitpulse.github.model.GitHubRepository;
+import io.github.abhiramchendika.gitpulse.github.model.GitHubSearchResult;
 import java.io.IOException;
 import java.net.URI;
 import java.time.Duration;
@@ -22,6 +25,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,6 +64,12 @@ public class GitHubClient {
   private static final ParameterizedTypeReference<List<GitHubContributorStats>> CONTRIBUTOR_STATS =
       new ParameterizedTypeReference<>() {};
   private static final ParameterizedTypeReference<Map<String, Long>> LANGUAGES =
+      new ParameterizedTypeReference<>() {};
+  private static final ParameterizedTypeReference<List<GitHubPullRequest>> PULL_REQUESTS =
+      new ParameterizedTypeReference<>() {};
+  private static final ParameterizedTypeReference<List<GitHubIssue>> ISSUES =
+      new ParameterizedTypeReference<>() {};
+  private static final ParameterizedTypeReference<List<Object>> ANY_LIST =
       new ParameterizedTypeReference<>() {};
 
   private final RestClient restClient;
@@ -155,24 +165,104 @@ public class GitHubClient {
    * @throws GitHubEmptyRepositoryException if the repository has no commits at all
    */
   public long countCommits(String owner, String repo) {
-    ResponseEntity<List<GitHubCommit>> response =
+    return countItems(uri -> uri.path("/repos/{owner}/{repo}/commits").build(owner, repo));
+  }
+
+  /**
+   * Number of pull requests in a state ("open", "closed" or "all"), in one request. "closed"
+   * includes merged pull requests.
+   */
+  public long countPullRequests(String owner, String repo, String state) {
+    return countItems(
+        uri ->
+            uri.path("/repos/{owner}/{repo}/pulls").queryParam("state", state).build(owner, repo));
+  }
+
+  /**
+   * {@code GET /search/issues}: the number of issues/pull requests matching a search query. Uses
+   * the Search API quota (10 requests/minute anonymous, 30 with a token), not the core quota.
+   */
+  public GitHubSearchResult searchIssueCount(String query) {
+    return requireBody(
         execute(
             () ->
                 restClient
                     .get()
                     .uri(
                         uri ->
-                            uri.path("/repos/{owner}/{repo}/commits")
+                            uri.path("/search/issues")
+                                .queryParam("q", "{q}")
                                 .queryParam("per_page", 1)
-                                .build(owner, repo))
+                                .build(query))
                     .retrieve()
-                    .toEntity(COMMITS));
-    var lastPage =
-        LinkHeader.parse(response.getHeaders().getFirst(HttpHeaders.LINK)).lastPageNumber();
-    if (lastPage.isPresent()) {
-      return lastPage.getAsInt();
+                    .body(GitHubSearchResult.class)));
+  }
+
+  /**
+   * Pull requests, newest first, until the page that reaches {@code createdSince}. The pulls
+   * endpoint has no date filter, so paging stops early instead: once a page ends with a pull
+   * request created before the window, older pages cannot contain anything in it.
+   */
+  public PagedResult<GitHubPullRequest> listPullRequests(
+      String owner, String repo, Instant createdSince, int maxPages) {
+    return fetchPages(
+        uri ->
+            uri.path("/repos/{owner}/{repo}/pulls")
+                .queryParam("state", "all")
+                .queryParam("sort", "created")
+                .queryParam("direction", "desc")
+                .queryParam("per_page", PER_PAGE)
+                .build(owner, repo),
+        PULL_REQUESTS,
+        maxPages,
+        pr -> pr.createdAt() != null && pr.createdAt().isBefore(createdSince));
+  }
+
+  /**
+   * Issues <em>and pull requests</em> (GitHub mixes them), newest first, stopping early like {@link
+   * #listPullRequests}. The endpoint's own {@code since} parameter filters by <em>update</em> time,
+   * which is not what "opened in this window" means, so it is not used.
+   */
+  public PagedResult<GitHubIssue> listIssues(
+      String owner, String repo, Instant createdSince, int maxPages) {
+    return fetchPages(
+        uri ->
+            uri.path("/repos/{owner}/{repo}/issues")
+                .queryParam("state", "all")
+                .queryParam("sort", "created")
+                .queryParam("direction", "desc")
+                .queryParam("per_page", PER_PAGE)
+                .build(owner, repo),
+        ISSUES,
+        maxPages,
+        issue -> issue.createdAt() != null && issue.createdAt().isBefore(createdSince));
+  }
+
+  /**
+   * Counts the items behind any list endpoint with a single request: ask for one item per page,
+   * then the page number of the {@code rel="last"} link is the total.
+   */
+  private long countItems(Function<UriBuilder, URI> endpoint) {
+    ResponseEntity<List<Object>> response =
+        execute(
+            () ->
+                restClient
+                    .get()
+                    .uri(uri -> endpoint.apply(uri.queryParam("per_page", 1)))
+                    .retrieve()
+                    .toEntity(ANY_LIST));
+    LinkHeader links = LinkHeader.parse(response.getHeaders().getFirst(HttpHeaders.LINK));
+    if (links.lastPageNumber().isPresent()) {
+      return links.lastPageNumber().getAsInt();
     }
-    // No "last" link: everything fit on the first page, i.e. 0 or 1 commits.
+    if (links.next().isPresent()) {
+      // More pages exist but no page number for the last one: the endpoint uses cursor-based
+      // pagination (GitHub's issues endpoint does), so the total is unknowable this way. Failing
+      // loudly beats silently reporting "1".
+      throw new GitHubApiException(
+          HttpStatus.OK.value(), "GitHub did not report a total for this list (cursor pagination)");
+    }
+    // Neither link: everything fit on the first page, i.e. 0 or 1 items.
     return response.getBody() == null ? 0 : response.getBody().size();
   }
 
@@ -218,12 +308,24 @@ public class GitHubClient {
                     }));
   }
 
-  /**
-   * Fetches the first page, then keeps following {@code rel="next"} links until there are none or
-   * {@code maxPages} requests have been made.
-   */
   private <T> PagedResult<T> fetchPages(
       Function<UriBuilder, URI> firstPage, ParameterizedTypeReference<List<T>> type, int maxPages) {
+    return fetchPages(firstPage, type, maxPages, item -> false);
+  }
+
+  /**
+   * Fetches the first page, then keeps following {@code rel="next"} links until there are none,
+   * {@code maxPages} requests have been made, or the last item of a page matches {@code pastWindow}
+   * (for lists sorted newest first: everything after it is older still).
+   *
+   * <p>{@code truncated} is true only when the page cap stopped us while more relevant pages
+   * existed; stopping because we reached the window's start is complete, not truncated.
+   */
+  private <T> PagedResult<T> fetchPages(
+      Function<UriBuilder, URI> firstPage,
+      ParameterizedTypeReference<List<T>> type,
+      int maxPages,
+      Predicate<T> pastWindow) {
     if (maxPages < 1) {
       throw new IllegalArgumentException("maxPages must be at least 1");
     }
@@ -231,24 +333,29 @@ public class GitHubClient {
     ResponseEntity<List<T>> response =
         execute(() -> restClient.get().uri(firstPage).retrieve().toEntity(type));
     int pages = 1;
-    addAll(items, response);
-    Optional<URI> next = nextPage(response);
+    boolean reachedEnd = addAll(items, response, pastWindow);
+    Optional<URI> next = reachedEnd ? Optional.empty() : nextPage(response);
 
     while (next.isPresent() && pages < maxPages) {
       URI nextUri = next.get();
       response = execute(() -> restClient.get().uri(nextUri).retrieve().toEntity(type));
       pages++;
-      addAll(items, response);
-      next = nextPage(response);
+      reachedEnd = addAll(items, response, pastWindow);
+      next = reachedEnd ? Optional.empty() : nextPage(response);
     }
     return new PagedResult<>(items, pages, next.isPresent());
   }
 
-  private static <T> void addAll(List<T> items, ResponseEntity<List<T>> response) {
+  /** Adds a page's items; returns true if its last item is already past the window. */
+  private static <T> boolean addAll(
+      List<T> items, ResponseEntity<List<T>> response, Predicate<T> pastWindow) {
+    List<T> page = response.getBody();
     // 204 No Content (e.g. contributors of an empty repository) has no body.
-    if (response.getBody() != null) {
-      items.addAll(response.getBody());
+    if (page == null || page.isEmpty()) {
+      return false;
     }
+    items.addAll(page);
+    return pastWindow.test(page.getLast());
   }
 
   /**

@@ -1,8 +1,11 @@
 package io.github.abhiramchendika.gitpulse.config;
 
+import io.github.abhiramchendika.gitpulse.analysis.ActivityAnalyzer;
 import io.github.abhiramchendika.gitpulse.analysis.CommitAnalyzer;
 import io.github.abhiramchendika.gitpulse.analysis.ContributorAnalyzer;
+import io.github.abhiramchendika.gitpulse.analysis.IssueAnalyzer;
 import io.github.abhiramchendika.gitpulse.analysis.LanguageAnalyzer;
+import io.github.abhiramchendika.gitpulse.analysis.PullRequestAnalyzer;
 import java.time.Clock;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
@@ -39,5 +42,20 @@ public class AnalysisConfig {
   @Bean
   LanguageAnalyzer languageAnalyzer() {
     return new LanguageAnalyzer();
+  }
+
+  @Bean
+  PullRequestAnalyzer pullRequestAnalyzer(AnalysisProperties properties) {
+    return new PullRequestAnalyzer(properties.topAuthors(), properties.recentCommits());
+  }
+
+  @Bean
+  IssueAnalyzer issueAnalyzer(AnalysisProperties properties) {
+    return new IssueAnalyzer(properties.topAuthors(), properties.recentCommits());
+  }
+
+  @Bean
+  ActivityAnalyzer activityAnalyzer() {
+    return new ActivityAnalyzer();
   }
 }

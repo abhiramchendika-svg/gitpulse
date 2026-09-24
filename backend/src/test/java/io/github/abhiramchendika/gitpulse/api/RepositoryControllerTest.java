@@ -11,9 +11,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import io.github.abhiramchendika.gitpulse.analysis.LanguageStatistics;
 import io.github.abhiramchendika.gitpulse.api.dto.LanguageResponse;
+import io.github.abhiramchendika.gitpulse.service.ActivityService;
 import io.github.abhiramchendika.gitpulse.service.CommitAnalyticsService;
 import io.github.abhiramchendika.gitpulse.service.ContributorAnalyticsService;
 import io.github.abhiramchendika.gitpulse.service.InvalidRequestException;
+import io.github.abhiramchendika.gitpulse.service.IssueAnalyticsService;
+import io.github.abhiramchendika.gitpulse.service.PullRequestAnalyticsService;
 import io.github.abhiramchendika.gitpulse.service.RepositoryNotFoundException;
 import io.github.abhiramchendika.gitpulse.service.RepositoryRef;
 import io.github.abhiramchendika.gitpulse.service.RepositoryService;
@@ -35,6 +38,9 @@ class RepositoryControllerTest {
   @MockitoBean private RepositoryService repositoryService;
   @MockitoBean private CommitAnalyticsService commitAnalyticsService;
   @MockitoBean private ContributorAnalyticsService contributorAnalyticsService;
+  @MockitoBean private PullRequestAnalyticsService pullRequestAnalyticsService;
+  @MockitoBean private IssueAnalyticsService issueAnalyticsService;
+  @MockitoBean private ActivityService activityService;
 
   @Test
   void languages_returns200() throws Exception {
@@ -102,6 +108,37 @@ class RepositoryControllerTest {
             eq(LocalDate.parse("2026-01-01")),
             eq(LocalDate.parse("2026-06-30")),
             eq(true));
+  }
+
+  @Test
+  void pullRequestsAndIssues_passWindowAndBotFilter() throws Exception {
+    mockMvc
+        .perform(
+            get("/api/v1/repositories/octocat/hello/pull-requests")
+                .param("since", "2026-01-01")
+                .param("excludeBots", "true"))
+        .andExpect(status().isOk());
+    mockMvc
+        .perform(get("/api/v1/repositories/octocat/hello/issues").param("until", "2026-06-30"))
+        .andExpect(status().isOk());
+    mockMvc.perform(get("/api/v1/repositories/octocat/hello/activity")).andExpect(status().isOk());
+
+    RepositoryRef ref = new RepositoryRef("octocat", "hello");
+    verify(pullRequestAnalyticsService).analyze(ref, LocalDate.parse("2026-01-01"), null, true);
+    verify(issueAnalyticsService).analyze(ref, null, LocalDate.parse("2026-06-30"), false);
+    verify(activityService).analyze(ref);
+  }
+
+  @Test
+  void newEndpoints_validateNamesToo() throws Exception {
+    mockMvc
+        .perform(get("/api/v1/repositories/-bad/hello/pull-requests"))
+        .andExpect(status().isBadRequest());
+    // ".." reaches the controller as the repo name and is rejected by the allow-list.
+    mockMvc
+        .perform(get("/api/v1/repositories/octocat/../activity"))
+        .andExpect(status().isBadRequest());
+    verifyNoInteractions(pullRequestAnalyticsService, activityService);
   }
 
   @Test

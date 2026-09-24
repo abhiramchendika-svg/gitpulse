@@ -14,8 +14,9 @@
   --danger: #cf222e;
   --radius: 8px;
 
-  /* Charts */
+  /* Charts: series-1/series-2 validated as a pair (light and dark) for colour-vision deficiency */
   --series-1: #2a78d6;
+  --series-2: #eb6834;
   --grid: #e1e0d9;
   --axis: #c3c2b7;
   --heat-0: #eff2f5;
@@ -51,6 +52,7 @@
     --danger: #f85149;
 
     --series-1: #3987e5;
+    --series-2: #d95926;
     --grid: #2c2c2a;
     --axis: #383835;
     /* In dark mode "near zero" recedes toward the dark surface, so the ramp runs dark -> light. */

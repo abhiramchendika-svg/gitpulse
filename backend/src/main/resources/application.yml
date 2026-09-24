@@ -13,7 +13,7 @@ spring:
       enabled: true
   cache:
     type: caffeine
-    cache-names: repositories,languages,commits,commitCounts,contributors,contributorStats
+    cache-names: repositories,languages,commits,commitCounts,contributors,contributorStats,pullRequests,issues,counts
     # Each cache keeps at most 500 entries for 10 minutes: fresh enough for activity data,
     # and repeated dashboard loads cost zero GitHub requests.
     caffeine:
@@ -45,6 +45,10 @@ gitpulse:
     recent-commits: 10
     inactivity-periods: 10
     contributor-limit: 100
+    # Pull requests and issues are listed newest first; paging stops early once items are older
+    # than the window, so these caps only matter for very busy repositories.
+    max-pull-request-pages: 5
+    max-issue-pages: 5
   cors:
     allowed-origins: ${GITPULSE_CORS_ALLOWED_ORIGINS:http://localhost:5173}
 

@@ -31,8 +31,9 @@ class CommitAnalyticsServiceTest {
       new CommitAnalyticsService(
           data,
           new CommitAnalyzer(Duration.ofDays(14), 10, 10, 10),
-          new AnalysisProperties(10, 5, 365, 3650, Duration.ofDays(14), 10, 10, 10, 100),
-          Clock.fixed(NOW, ZoneOffset.UTC));
+          new AnalysisWindows(
+              new AnalysisProperties(10, 5, 365, 3650, Duration.ofDays(14), 10, 10, 10, 100, 5, 5),
+              Clock.fixed(NOW, ZoneOffset.UTC)));
 
   private static CommitRecord commit(String when, boolean bot) {
     return commit(when, when, bot);
@@ -53,31 +54,14 @@ class CommitAnalyticsServiceTest {
   }
 
   @Test
-  void defaultRange_isLast365DaysIncludingToday() {
-    var range = service.resolveRange(null, null, TODAY);
-
-    assertThat(range.until()).isEqualTo(TODAY);
-    assertThat(range.since()).isEqualTo(TODAY.minusDays(364));
-  }
-
-  @Test
-  void rejectsFutureUntil_reversedRange_andTooLongRange() {
-    assertThatThrownBy(() -> service.resolveRange(null, TODAY.plusDays(1), TODAY))
-        .isInstanceOf(InvalidRequestException.class)
-        .hasMessageContaining("future");
-    assertThatThrownBy(() -> service.resolveRange(TODAY, TODAY.minusDays(1), TODAY))
-        .isInstanceOf(InvalidRequestException.class)
-        .hasMessageContaining("before");
-    assertThatThrownBy(() -> service.resolveRange(TODAY.minusDays(3650), TODAY, TODAY))
-        .isInstanceOf(InvalidRequestException.class)
-        .hasMessageContaining("3650");
-  }
-
-  @Test
-  void singleDayRange_isAllowed() {
-    var range = service.resolveRange(TODAY, TODAY, TODAY);
-
-    assertThat(range.since()).isEqualTo(range.until());
+  void invalidRange_isRejectedBeforeAnyGitHubCall() {
+    assertThatThrownBy(() -> service.analyze(REF, TODAY, TODAY.minusDays(1), false))
+        .isInstanceOf(InvalidRequestException.class);
+    verify(data, never())
+        .commits(
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any());
   }
 
   @Test

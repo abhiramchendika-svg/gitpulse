@@ -53,6 +53,7 @@ export interface RepositoryOverview {
   defaultBranch: string
   archived: boolean
   fork: boolean
+  hasIssues: boolean
 }
 
 export interface LanguageShare {
@@ -166,5 +167,97 @@ export interface ContributorAnalyticsResponse {
     botCount: number
     lineStatsStatus: LineStatsStatus
     contributors: Contributor[]
+  }
+}
+
+export interface DurationSummary {
+  count: number
+  medianHours: number
+  p90Hours: number
+}
+
+export interface ActorCount {
+  login: string
+  bot: boolean
+  count: number
+}
+
+/** GET /api/v1/repositories/{owner}/{repo}/pull-requests */
+export interface PullRequestAnalyticsResponse {
+  repository: string
+  meta: AnalysisMeta
+  /** All-time. `merged`/`closedWithoutMerge` are null when the Search API was unavailable. */
+  totals: { open: number; closed: number; merged: number | null; closedWithoutMerge: number | null }
+  statistics: {
+    opened: number
+    merged: number
+    closedWithoutMerge: number
+    stillOpen: number
+    openedByBots: number
+    mergedPercentOfClosed: number | null
+    timeToMerge: DurationSummary | null
+    weekly: { weekStart: string; opened: number; merged: number }[]
+    topAuthors: ActorCount[]
+    recent: {
+      number: number
+      title: string
+      authorLogin: string | null
+      draft: boolean
+      createdAt: string
+      status: 'open' | 'merged' | 'closed'
+      htmlUrl: string
+    }[]
+  }
+}
+
+/** GET /api/v1/repositories/{owner}/{repo}/issues */
+export interface IssueAnalyticsResponse {
+  repository: string
+  meta: AnalysisMeta
+  issuesEnabled: boolean
+  /** All-time. `closed` is null when the Search API was unavailable. */
+  totals: { open: number; closed: number | null } | null
+  statistics: {
+    opened: number
+    closed: number
+    stillOpen: number
+    openedByBots: number
+    closedAsCompleted: number
+    closedAsNotPlanned: number
+    closedOther: number
+    timeToClose: DurationSummary | null
+    weekly: { weekStart: string; opened: number; closed: number }[]
+    topOpeners: ActorCount[]
+    recent: {
+      number: number
+      title: string
+      authorLogin: string | null
+      createdAt: string
+      open: boolean
+      comments: number
+      htmlUrl: string
+    }[]
+  } | null
+}
+
+/** GET /api/v1/repositories/{owner}/{repo}/activity */
+export interface ActivityResponse {
+  repository: string
+  generatedAt: string
+  indicators: {
+    lastCommitAt: string | null
+    daysSinceLastCommit: number | null
+    lastPushAt: string | null
+    commitsLast30Days: number
+    commitsLast90Days: number
+    activeWeeksOfLast12: number
+    commitsPartial: boolean
+    pullRequestsOpenedLast90Days: number
+    pullRequestsMergedLast90Days: number
+    pullRequestsPartial: boolean
+    /** null when the repository has issues disabled */
+    issuesOpenedLast90Days: number | null
+    issuesClosedLast90Days: number | null
+    issuesPartial: boolean
   }
 }

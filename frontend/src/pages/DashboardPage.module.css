@@ -23,6 +23,13 @@
   font-size: 1.15rem;
 }
 
+.workItems {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 26rem), 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+
 .allTime {
   display: grid;
   grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);

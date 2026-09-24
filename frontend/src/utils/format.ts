@@ -72,6 +72,13 @@ export function formatSizeKb(kb: number): string {
   return `${(kb / 1024 / 1024).toFixed(1)} GB`
 }
 
+/** A duration given in hours: "45 min", "5.2 hours", "3.4 days". */
+export function formatHours(hours: number): string {
+  if (hours < 1) return `${Math.max(1, Math.round(hours * 60))} min`
+  if (hours < 48) return `${Math.round(hours * 10) / 10} hours`
+  return formatDays(hours / 24)
+}
+
 /** "1 day", "15.5 days". */
 export function formatDays(days: number): string {
   const rounded = Math.round(days * 10) / 10

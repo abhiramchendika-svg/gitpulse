@@ -113,3 +113,64 @@ Known gaps in GitHub's data, surfaced rather than hidden:
   excludes commits not linked to any GitHub account.
 - For some very large repositories GitHub refuses to list contributors; the response then has
   `available: false`.
+
+## Pull requests: `GET /api/v1/repositories/{owner}/{repo}/pull-requests`
+
+**Totals** are all-time:
+
+| Field                       | How it is obtained                                                                                                                                                                                   |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `totals.open`, `.closed`    | GitHub-provided. `GET /pulls?state=…&per_page=1`: the page number of the `rel="last"` link is the total (one request each). `closed` includes merged.                                                |
+| `totals.merged`             | GitHub-provided via the Search API (`repo:o/r is:pr is:merged`); the pulls endpoint cannot filter by merged. **`null`** when the Search API rate limit is hit or GitHub reports an incomplete count. |
+| `totals.closedWithoutMerge` | GitPulse-calculated: `closed - merged`; `null` when `merged` is.                                                                                                                                     |
+
+**Statistics** describe the **cohort of pull requests opened in the window** (by `created_at`):
+
+| Field                                       | Definition                                                                                                                                                                                                               |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `opened`                                    | Pull requests created in the window.                                                                                                                                                                                     |
+| `merged`, `closedWithoutMerge`, `stillOpen` | What has happened to that cohort **so far**. A pull request opened last week may simply still be open.                                                                                                                   |
+| `mergedPercentOfClosed`                     | `merged / (merged + closedWithoutMerge) × 100`; `null` if none are closed. Open ones are excluded because their outcome is unknown.                                                                                      |
+| `timeToMerge`                               | `merged_at - created_at` over merged pull requests of the cohort: **median** and **90th percentile** (nearest-rank), in hours. Not a mean: one pull request left open for years would distort it. `null` if none merged. |
+| `weekly[].opened` / `.merged`               | Cohort pull requests created / merged in each week.                                                                                                                                                                      |
+| `topAuthors`                                | Pull requests opened in the window, per author.                                                                                                                                                                          |
+
+The pulls endpoint has no date filter. GitPulse lists newest first and **stops paging** once a page
+ends before the window (at most 5 pages = 500 pull requests). If the cap is reached first,
+`meta.truncated` is `true` and the window is shortened to the oldest `created_at` fetched.
+
+## Issues: `GET /api/v1/repositories/{owner}/{repo}/issues`
+
+GitHub treats every pull request as an issue. **GitPulse removes pull requests everywhere**
+(items carrying a `pull_request` field).
+
+| Field                                     | Definition                                                                                                                                                                                                  |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `issuesEnabled`                           | `false` when the repository has Issues turned off; totals and statistics are then `null`.                                                                                                                   |
+| `totals.open`                             | Repository `open_issues_count` (which includes open pull requests) **minus** open pull requests.                                                                                                            |
+| `totals.closed`                           | Search API `repo:o/r is:issue is:closed`. The issues list uses **cursor pagination** (no `rel="last"` link), so the `per_page=1` counting trick cannot be used. `null` when the Search API is rate limited. |
+| `opened`, `closed`, `stillOpen`           | Cohort of issues created in the window, as for pull requests.                                                                                                                                               |
+| `closedAsCompleted`, `closedAsNotPlanned` | GitHub's `state_reason` of closed cohort issues. `closedOther` = `duplicate` or no reason recorded (common for older issues).                                                                               |
+| `timeToClose`                             | `closed_at - created_at`: median and 90th percentile, in hours.                                                                                                                                             |
+| `weekly[].opened` / `.closed`             | Cohort issues created / closed in each week.                                                                                                                                                                |
+
+Pull requests and issues share the same pages of GitHub's issues list, so in
+pull-request-heavy repositories a page holds few issues and the 5-page cap is reached sooner.
+
+## Recent activity: `GET /api/v1/repositories/{owner}/{repo}/activity`
+
+Fixed look-back periods ending at the time of the request. **There is no overall score.**
+
+| Field                                                    | Definition                                                                                                 |
+| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `lastCommitAt`, `daysSinceLastCommit`                    | Newest author date on the default branch within the last year; `null` if none.                             |
+| `lastPushAt`                                             | Repository `pushed_at` (any branch).                                                                       |
+| `commitsLast30Days`, `commitsLast90Days`                 | Commits authored in `(now - N days, now]`.                                                                 |
+| `activeWeeksOfLast12`                                    | The last 84 days as twelve **rolling** 7-day periods ending now; how many contain a commit.                |
+| `pullRequestsOpenedLast90Days`                           | Pull requests created in the last 90 days.                                                                 |
+| `pullRequestsMergedLast90Days`                           | Pull requests merged in the last 90 days (among those created within the last year).                       |
+| `issuesOpenedLast90Days`, `issuesClosedLast90Days`       | Likewise for issues; `null` when issues are disabled.                                                      |
+| `commitsPartial`, `pullRequestsPartial`, `issuesPartial` | `true` when the sample did not reach back 90 days (page cap): counts are **lower bounds**, shown as "12+". |
+
+The activity endpoint reuses the cached samples of the default one-year views, so it normally
+costs no extra GitHub requests.

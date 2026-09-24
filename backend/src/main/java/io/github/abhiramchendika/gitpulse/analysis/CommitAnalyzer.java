@@ -7,14 +7,12 @@ import io.github.abhiramchendika.gitpulse.analysis.CommitStatistics.RecentCommit
 import io.github.abhiramchendika.gitpulse.analysis.CommitStatistics.WeekCount;
 import io.github.abhiramchendika.gitpulse.analysis.model.AnalysisWindow;
 import io.github.abhiramchendika.gitpulse.analysis.model.CommitRecord;
-import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
-import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -97,18 +95,11 @@ public class CommitAnalyzer {
 
   /** Zero-filled weekly buckets covering the whole window, so charts show quiet weeks too. */
   private static List<WeekCount> weekly(List<CommitRecord> commits, AnalysisWindow window) {
-    Map<LocalDate, Integer> counts = new HashMap<>();
-    for (CommitRecord commit : commits) {
-      counts.merge(weekStart(commit.authoredAt()), 1, Integer::sum);
-    }
-    List<WeekCount> result = new ArrayList<>();
-    LocalDate last = weekStart(window.until().minusNanos(1));
-    for (LocalDate week = weekStart(window.since());
-        !week.isAfter(last);
-        week = week.plusWeeks(1)) {
-      result.add(new WeekCount(week, counts.getOrDefault(week, 0)));
-    }
-    return result;
+    return TimeBuckets.weekly(commits.stream().map(CommitRecord::authoredAt).toList(), window)
+        .entrySet()
+        .stream()
+        .map(e -> new WeekCount(e.getKey(), e.getValue()))
+        .toList();
   }
 
   private static List<MonthCount> monthly(List<CommitRecord> commits, AnalysisWindow window) {
@@ -127,10 +118,7 @@ public class CommitAnalyzer {
   }
 
   static LocalDate weekStart(Instant instant) {
-    return instant
-        .atZone(ZoneOffset.UTC)
-        .toLocalDate()
-        .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+    return TimeBuckets.weekStart(instant);
   }
 
   private List<AuthorActivity> topAuthors(List<CommitRecord> commits) {

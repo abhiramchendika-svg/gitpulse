@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 import io.github.abhiramchendika.gitpulse.github.GitHubClient;
 import io.github.abhiramchendika.gitpulse.github.StatsResult;
 import io.github.abhiramchendika.gitpulse.github.model.GitHubContributorStats;
+import io.github.abhiramchendika.gitpulse.github.model.GitHubSearchResult;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,6 +44,31 @@ class CachingIntegrationTest {
     data.languages(new RepositoryRef("OctoCat", "Hello"));
 
     verify(gitHubClient, times(1)).getLanguages("octocat", "hello");
+  }
+
+  /**
+   * Several methods share the "counts" cache with the same argument. Without the method name in the
+   * key they would return each other's values.
+   */
+  @Test
+  void countMethodsSharingACache_doNotCollide() {
+    RepositoryRef ref = new RepositoryRef("octocat", "hello");
+    when(gitHubClient.countPullRequests("octocat", "hello", "open")).thenReturn(3L);
+    when(gitHubClient.countPullRequests("octocat", "hello", "closed")).thenReturn(40L);
+    when(gitHubClient.searchIssueCount("repo:octocat/hello is:issue is:closed"))
+        .thenReturn(new GitHubSearchResult(90, false));
+    when(gitHubClient.searchIssueCount("repo:octocat/hello is:pr is:merged"))
+        .thenReturn(new GitHubSearchResult(35, false));
+
+    assertThat(data.openPullRequestCount(ref)).isEqualTo(3);
+    assertThat(data.closedPullRequestCount(ref)).isEqualTo(40);
+    assertThat(data.closedIssueCount(ref)).isEqualTo(90);
+    assertThat(data.mergedPullRequestCount(ref)).isEqualTo(35);
+    // And each is cached independently.
+    assertThat(data.openPullRequestCount(ref)).isEqualTo(3);
+    assertThat(data.closedIssueCount(ref)).isEqualTo(90);
+    verify(gitHubClient, times(1)).countPullRequests("octocat", "hello", "open");
+    verify(gitHubClient, times(1)).searchIssueCount("repo:octocat/hello is:issue is:closed");
   }
 
   @Test

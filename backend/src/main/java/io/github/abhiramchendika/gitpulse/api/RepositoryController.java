@@ -1,11 +1,17 @@
 package io.github.abhiramchendika.gitpulse.api;
 
+import io.github.abhiramchendika.gitpulse.api.dto.ActivityResponse;
 import io.github.abhiramchendika.gitpulse.api.dto.CommitAnalyticsResponse;
 import io.github.abhiramchendika.gitpulse.api.dto.ContributorAnalyticsResponse;
+import io.github.abhiramchendika.gitpulse.api.dto.IssueAnalyticsResponse;
 import io.github.abhiramchendika.gitpulse.api.dto.LanguageResponse;
+import io.github.abhiramchendika.gitpulse.api.dto.PullRequestAnalyticsResponse;
 import io.github.abhiramchendika.gitpulse.api.dto.RepositoryOverviewResponse;
+import io.github.abhiramchendika.gitpulse.service.ActivityService;
 import io.github.abhiramchendika.gitpulse.service.CommitAnalyticsService;
 import io.github.abhiramchendika.gitpulse.service.ContributorAnalyticsService;
+import io.github.abhiramchendika.gitpulse.service.IssueAnalyticsService;
+import io.github.abhiramchendika.gitpulse.service.PullRequestAnalyticsService;
 import io.github.abhiramchendika.gitpulse.service.RepositoryRef;
 import io.github.abhiramchendika.gitpulse.service.RepositoryService;
 import jakarta.validation.constraints.Pattern;
@@ -20,6 +26,9 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * Repository analytics endpoints. Controllers only validate input and delegate: all logic lives in
  * services, which keeps these methods trivial to read and test.
+ *
+ * <p>Windowed endpoints share the same query parameters: {@code since} / {@code until} as {@code
+ * yyyy-MM-dd} UTC days (default: the last 365 days including today) and {@code excludeBots}.
  */
 @RestController
 @RequestMapping("/api/v1/repositories/{owner}/{repo}")
@@ -28,14 +37,23 @@ public class RepositoryController {
   private final RepositoryService repositoryService;
   private final CommitAnalyticsService commitAnalyticsService;
   private final ContributorAnalyticsService contributorAnalyticsService;
+  private final PullRequestAnalyticsService pullRequestAnalyticsService;
+  private final IssueAnalyticsService issueAnalyticsService;
+  private final ActivityService activityService;
 
   public RepositoryController(
       RepositoryService repositoryService,
       CommitAnalyticsService commitAnalyticsService,
-      ContributorAnalyticsService contributorAnalyticsService) {
+      ContributorAnalyticsService contributorAnalyticsService,
+      PullRequestAnalyticsService pullRequestAnalyticsService,
+      IssueAnalyticsService issueAnalyticsService,
+      ActivityService activityService) {
     this.repositoryService = repositoryService;
     this.commitAnalyticsService = commitAnalyticsService;
     this.contributorAnalyticsService = contributorAnalyticsService;
+    this.pullRequestAnalyticsService = pullRequestAnalyticsService;
+    this.issueAnalyticsService = issueAnalyticsService;
+    this.activityService = activityService;
   }
 
   @GetMapping
@@ -52,11 +70,6 @@ public class RepositoryController {
     return repositoryService.languages(new RepositoryRef(owner, repo));
   }
 
-  /**
-   * @param since first day to include, {@code yyyy-MM-dd} (UTC); default: 365 days before until
-   * @param until last day to include, {@code yyyy-MM-dd} (UTC); default: today
-   * @param excludeBots drop commits made by bot accounts before analysing
-   */
   @GetMapping("/commits")
   public CommitAnalyticsResponse commits(
       @PathVariable @Pattern(regexp = GitHubNames.OWNER) String owner,
@@ -75,5 +88,38 @@ public class RepositoryController {
       @PathVariable @Pattern(regexp = GitHubNames.OWNER) String owner,
       @PathVariable @Pattern(regexp = GitHubNames.REPO) String repo) {
     return contributorAnalyticsService.analyze(new RepositoryRef(owner, repo));
+  }
+
+  @GetMapping("/pull-requests")
+  public PullRequestAnalyticsResponse pullRequests(
+      @PathVariable @Pattern(regexp = GitHubNames.OWNER) String owner,
+      @PathVariable @Pattern(regexp = GitHubNames.REPO) String repo,
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+          LocalDate since,
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+          LocalDate until,
+      @RequestParam(defaultValue = "false") boolean excludeBots) {
+    return pullRequestAnalyticsService.analyze(
+        new RepositoryRef(owner, repo), since, until, excludeBots);
+  }
+
+  @GetMapping("/issues")
+  public IssueAnalyticsResponse issues(
+      @PathVariable @Pattern(regexp = GitHubNames.OWNER) String owner,
+      @PathVariable @Pattern(regexp = GitHubNames.REPO) String repo,
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+          LocalDate since,
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+          LocalDate until,
+      @RequestParam(defaultValue = "false") boolean excludeBots) {
+    return issueAnalyticsService.analyze(new RepositoryRef(owner, repo), since, until, excludeBots);
+  }
+
+  /** Factual indicators for the last 30/90 days; no parameters, no score. */
+  @GetMapping("/activity")
+  public ActivityResponse activity(
+      @PathVariable @Pattern(regexp = GitHubNames.OWNER) String owner,
+      @PathVariable @Pattern(regexp = GitHubNames.REPO) String repo) {
+    return activityService.analyze(new RepositoryRef(owner, repo));
   }
 }
