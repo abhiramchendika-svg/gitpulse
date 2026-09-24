@@ -9,9 +9,17 @@ export interface DashboardState {
   repo: RepoRef | null
   range: Range
   excludeBots: boolean
+  /**
+   * The compare view: null when not comparing, [] when the compare page is open but nothing has
+   * been chosen yet, otherwise the two repositories being compared.
+   */
+  compare: RepoRef[] | null
 }
 
-/** Reads dashboard state from the URL, e.g. ?repo=facebook/react&range=90d&bots=exclude */
+/**
+ * Reads dashboard state from the URL, e.g. ?repo=facebook/react&range=90d&bots=exclude
+ * or ?compare=facebook/react,vuejs/core
+ */
 export function readUrlState(search: string): DashboardState {
   const params = new URLSearchParams(search)
   const parsed = parseRepoInput(params.get('repo') ?? '')
@@ -20,14 +28,28 @@ export function readUrlState(search: string): DashboardState {
     repo: parsed.ok ? parsed.value : null,
     range: RANGES.includes(range as Range) ? (range as Range) : DEFAULT_RANGE,
     excludeBots: params.get('bots') === 'exclude',
+    compare: params.has('compare') ? parseCompare(params.get('compare') ?? '') : null,
   }
+}
+
+/** "a/b,c/d" -> both refs; anything else (incomplete or invalid) -> [] (empty compare form). */
+function parseCompare(value: string): RepoRef[] {
+  const refs = value
+    .split(',')
+    .map((part) => parseRepoInput(part))
+    .flatMap((result) => (result.ok ? [result.value] : []))
+  return refs.length === 2 ? refs : []
 }
 
 export function toSearch(state: DashboardState): string {
   const params = new URLSearchParams()
-  if (state.repo) params.set('repo', `${state.repo.owner}/${state.repo.repo}`)
-  if (state.range !== DEFAULT_RANGE) params.set('range', state.range)
-  if (state.excludeBots) params.set('bots', 'exclude')
+  if (state.compare !== null) {
+    params.set('compare', state.compare.map((r) => `${r.owner}/${r.repo}`).join(','))
+  } else {
+    if (state.repo) params.set('repo', `${state.repo.owner}/${state.repo.repo}`)
+    if (state.range !== DEFAULT_RANGE) params.set('range', state.range)
+    if (state.excludeBots) params.set('bots', 'exclude')
+  }
   const qs = params.toString()
   return qs ? `?${qs}` : window.location.pathname
 }
@@ -51,7 +73,8 @@ export function useUrlState(): [DashboardState, (next: Partial<DashboardState>) 
     // them twice in development, which pushed duplicate history entries and broke "back").
     const merged = { ...readUrlState(window.location.search), ...next }
     const url = toSearch(merged)
-    if ('repo' in next) {
+    // Navigation (a new repository or comparison) gets its own history entry; filters do not.
+    if ('repo' in next || 'compare' in next) {
       window.history.pushState(null, '', url)
     } else {
       window.history.replaceState(null, '', url)

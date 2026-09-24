@@ -8,6 +8,7 @@ import io.github.abhiramchendika.gitpulse.github.exception.GitHubNotFoundExcepti
 import io.github.abhiramchendika.gitpulse.github.exception.GitHubRateLimitException;
 import io.github.abhiramchendika.gitpulse.github.exception.GitHubUnavailableException;
 import io.github.abhiramchendika.gitpulse.github.model.GitHubCommit;
+import io.github.abhiramchendika.gitpulse.github.model.GitHubCommitDetail;
 import io.github.abhiramchendika.gitpulse.github.model.GitHubContributor;
 import io.github.abhiramchendika.gitpulse.github.model.GitHubContributorStats;
 import io.github.abhiramchendika.gitpulse.github.model.GitHubIssue;
@@ -56,6 +57,10 @@ public class GitHubClient {
 
   /** GitHub's maximum page size. Bigger pages = fewer requests against the rate limit. */
   static final int PER_PAGE = 100;
+
+  /** Commit SHAs are only ever passed through from GitHub, but are still checked before use. */
+  private static final java.util.regex.Pattern SHA =
+      java.util.regex.Pattern.compile("^[0-9a-f]{7,64}$");
 
   private static final ParameterizedTypeReference<List<GitHubCommit>> COMMITS =
       new ParameterizedTypeReference<>() {};
@@ -166,6 +171,32 @@ public class GitHubClient {
    */
   public long countCommits(String owner, String repo) {
     return countItems(uri -> uri.path("/repos/{owner}/{repo}/commits").build(owner, repo));
+  }
+
+  /**
+   * Number of contributors with a linked GitHub account, in one request (this endpoint uses page
+   * numbers, so the {@code rel="last"} trick works). GitHub links at most 500.
+   */
+  public long countContributors(String owner, String repo) {
+    return countItems(uri -> uri.path("/repos/{owner}/{repo}/contributors").build(owner, repo));
+  }
+
+  /**
+   * {@code GET /repos/{owner}/{repo}/commits/{sha}}: one commit with its changed files. One request
+   * per commit, which is what makes file activity expensive.
+   */
+  public GitHubCommitDetail getCommit(String owner, String repo, String sha) {
+    if (!SHA.matcher(sha).matches()) {
+      throw new IllegalArgumentException("Not a commit SHA: " + sha);
+    }
+    return requireBody(
+        execute(
+            () ->
+                restClient
+                    .get()
+                    .uri("/repos/{owner}/{repo}/commits/{sha}", owner, repo, sha)
+                    .retrieve()
+                    .body(GitHubCommitDetail.class)));
   }
 
   /**

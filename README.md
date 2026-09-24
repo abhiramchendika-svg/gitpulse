@@ -3,9 +3,10 @@
 **GitHub repository & commit analyzer.** GitPulse turns public GitHub activity (commits,
 contributors, languages, pull requests, issues) into factual, descriptive analytics.
 
-> **Status: early development (Phase 4 – pull requests and issues).** Enter a repository to see
-> its overview, recent activity, commits, pull requests, issues, contributors and languages.
-> Repository comparison and file activity come next; see [Roadmap](#roadmap).
+> **Status: early development (Phase 5a – file activity and comparison).** Enter a repository to
+> see its overview, recent activity, commits, pull requests, issues, contributors, languages and
+> (on demand) file activity, or compare two repositories side by side. GitHub profile analysis
+> comes next; see [Roadmap](#roadmap).
 
 <!-- Screenshots: add docs/screenshots/dashboard.png once the repository is published. -->
 
@@ -23,6 +24,9 @@ contributors, languages, pull requests, issues) into factual, descriptive analyt
 - **Contributors:** commit shares, how many people account for half of all commits, and lines
   added/deleted where GitHub provides them.
 - **Languages:** share of code by size.
+- **File activity** (on demand): most frequently changed files, highest churn, busiest
+  directories, based on the most recent commits; renames are followed.
+- **Compare** two repositories: the same facts side by side, charts on a shared scale, no winner.
 - Every view is a shareable link (`?repo=owner/name&range=90d`), and every chart has a table
   view. Paste `owner/repo` or any GitHub URL.
 
@@ -95,6 +99,8 @@ Use a **fine-grained, read-only, public-repositories** token. Never commit it.
 | GET    | `/api/v1/repositories/{owner}/{repo}/pull-requests` | Pull request activity + all-time totals           |
 | GET    | `/api/v1/repositories/{owner}/{repo}/issues`        | Issue activity + all-time totals (PRs excluded)   |
 | GET    | `/api/v1/repositories/{owner}/{repo}/activity`      | Recent-activity indicators (30/90 days)           |
+| GET    | `/api/v1/repositories/{owner}/{repo}/files`         | File activity from recent commits (`sample`)      |
+| GET    | `/api/v1/compare?repos=a/b,c/d`                     | Two repositories side by side                     |
 
 Full reference with examples: [docs/api.md](docs/api.md). Metric definitions:
 [docs/metrics.md](docs/metrics.md).
@@ -127,7 +133,8 @@ Formatting: `./mvnw spotless:apply` (Java, google-java-format) and `npm run form
 2. ✅ Repository analysis: metadata, commits, contributors, languages
 3. ✅ Dashboard: charts and responsive layout
 4. ✅ Pull request and issue analytics, recent activity, rate-limit handling
-5. File activity, repository comparison, profile analysis, caching
+5. ✅ (5a) File activity, repository comparison, per-cache lifetimes, bounded parallel fetching
+   · (5b) GitHub profile analysis
 6. Export (CSV/JSON) and full open-source documentation
 7. Optional AI features (evaluated, not assumed)
 
@@ -143,6 +150,8 @@ Formatting: `./mvnw spotless:apply` (Java, google-java-format) and `npm run form
 - Pull request and issue statistics use at most 500 items per window (flagged when shortened).
   All-time merged and closed-issue counts use GitHub's Search API and show "Unavailable" when
   its separate rate limit is reached.
+- File activity samples recent commits (20 without a token) rather than the whole history, since
+  each commit costs one GitHub request.
 
 ## License
 

@@ -13,6 +13,7 @@ spring:
       enabled: true
   cache:
     type: caffeine
+    # commitDetails is configured separately (24h) in CacheConfig.
     cache-names: repositories,languages,commits,commitCounts,contributors,contributorStats,pullRequests,issues,counts
     # Each cache keeps at most 500 entries for 10 minutes: fresh enough for activity data,
     # and repeated dashboard loads cost zero GitHub requests.
@@ -49,6 +50,14 @@ gitpulse:
     # than the window, so these caps only matter for very busy repositories.
     max-pull-request-pages: 5
     max-issue-pages: 5
+  file-activity:
+    # One GitHub request per sampled commit (cached 24h by SHA). Anonymous access has only 60
+    # requests per hour in total, so the sample is much smaller without a token.
+    anonymous-max-sample: 20
+    default-sample: 100
+    max-sample: 300
+    parallel-requests: 4
+    list-limit: 15
   cors:
     allowed-origins: ${GITPULSE_CORS_ALLOWED_ORIGINS:http://localhost:5173}
 

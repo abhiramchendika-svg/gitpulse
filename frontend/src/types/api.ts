@@ -261,3 +261,73 @@ export interface ActivityResponse {
     issuesPartial: boolean
   }
 }
+
+export interface FileStat {
+  path: string
+  commits: number
+  additions: number
+  deletions: number
+  churn: number
+  distinctAuthors: number
+  lastChangedAt: string
+  deleted: boolean
+}
+
+/** GET /api/v1/repositories/{owner}/{repo}/files */
+export interface FileActivityResponse {
+  repository: string
+  meta: {
+    generatedAt: string
+    requestedSample: number
+    sampleLimit: number
+    authenticated: boolean
+    candidateCommits: number
+    mergeCommitsSkipped: number
+  }
+  statistics: {
+    commitsAnalyzed: number
+    sampleFrom: string | null
+    sampleTo: string | null
+    filesTouched: number
+    commitsWithTruncatedFiles: number
+    mostFrequentlyChanged: FileStat[]
+    highestChurn: FileStat[]
+    directories: { path: string; commits: number; filesTouched: number; churn: number }[]
+    recentlyChanged: FileStat[]
+  }
+}
+
+export interface ComparisonSummary {
+  fullName: string
+  htmlUrl: string
+  description: string | null
+  stars: number
+  forks: number
+  watchers: number
+  openIssuesAndPullRequests: number
+  primaryLanguage: string | null
+  topLanguages: LanguageShare[]
+  license: string | null
+  createdAt: string
+  ageYears: number
+  pushedAt: string | null
+  archived: boolean
+  contributors: number | null
+  commits: {
+    total: number
+    averagePerWeek: number
+    activeWeeks: number
+    totalWeeks: number
+    distinctAuthors: number
+    truncated: boolean
+    since: string
+  }
+  weekly: { weekStart: string; commits: number }[]
+  activity: ActivityResponse['indicators']
+}
+
+/** GET /api/v1/compare?repos=a/b,c/d */
+export interface ComparisonResponse {
+  generatedAt: string
+  repositories: ComparisonSummary[]
+}

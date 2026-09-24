@@ -14,6 +14,7 @@ import io.github.abhiramchendika.gitpulse.api.dto.LanguageResponse;
 import io.github.abhiramchendika.gitpulse.service.ActivityService;
 import io.github.abhiramchendika.gitpulse.service.CommitAnalyticsService;
 import io.github.abhiramchendika.gitpulse.service.ContributorAnalyticsService;
+import io.github.abhiramchendika.gitpulse.service.FileActivityService;
 import io.github.abhiramchendika.gitpulse.service.InvalidRequestException;
 import io.github.abhiramchendika.gitpulse.service.IssueAnalyticsService;
 import io.github.abhiramchendika.gitpulse.service.PullRequestAnalyticsService;
@@ -41,6 +42,23 @@ class RepositoryControllerTest {
   @MockitoBean private PullRequestAnalyticsService pullRequestAnalyticsService;
   @MockitoBean private IssueAnalyticsService issueAnalyticsService;
   @MockitoBean private ActivityService activityService;
+  @MockitoBean private FileActivityService fileActivityService;
+
+  @Test
+  void files_passesSampleAndValidatesItsRange() throws Exception {
+    mockMvc
+        .perform(get("/api/v1/repositories/octocat/hello/files").param("sample", "25"))
+        .andExpect(status().isOk());
+    verify(fileActivityService).analyze(new RepositoryRef("octocat", "hello"), 25);
+
+    mockMvc
+        .perform(get("/api/v1/repositories/octocat/hello/files").param("sample", "0"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
+    mockMvc
+        .perform(get("/api/v1/repositories/octocat/hello/files").param("sample", "5000"))
+        .andExpect(status().isBadRequest());
+  }
 
   @Test
   void languages_returns200() throws Exception {

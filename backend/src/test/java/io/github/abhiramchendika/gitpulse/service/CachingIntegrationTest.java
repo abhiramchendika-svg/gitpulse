@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 
 import io.github.abhiramchendika.gitpulse.github.GitHubClient;
 import io.github.abhiramchendika.gitpulse.github.StatsResult;
+import io.github.abhiramchendika.gitpulse.github.model.GitHubCommitDetail;
 import io.github.abhiramchendika.gitpulse.github.model.GitHubContributorStats;
 import io.github.abhiramchendika.gitpulse.github.model.GitHubSearchResult;
 import java.util.List;
@@ -69,6 +70,20 @@ class CachingIntegrationTest {
     assertThat(data.closedIssueCount(ref)).isEqualTo(90);
     verify(gitHubClient, times(1)).countPullRequests("octocat", "hello", "open");
     verify(gitHubClient, times(1)).searchIssueCount("repo:octocat/hello is:issue is:closed");
+  }
+
+  @Test
+  void commitDetails_useTheirOwnLongLivedCache_keyedByRepositoryAndSha() {
+    RepositoryRef ref = new RepositoryRef("octocat", "hello");
+    when(gitHubClient.getCommit("octocat", "hello", "abc1234"))
+        .thenReturn(new GitHubCommitDetail("abc1234", "h", null, null, List.of(), List.of()));
+
+    data.commitFiles(ref, "abc1234");
+    data.commitFiles(new RepositoryRef("OctoCat", "Hello"), "abc1234");
+
+    verify(gitHubClient, times(1)).getCommit("octocat", "hello", "abc1234");
+    assertThat(cacheManager.getCacheNames()).contains("commitDetails");
+    assertThat(cacheManager.getCache("commitDetails").get("octocat/hello@abc1234")).isNotNull();
   }
 
   @Test

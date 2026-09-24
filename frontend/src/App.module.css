@@ -21,6 +21,24 @@
   text-decoration: none;
 }
 
+.navLink {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-decoration: none;
+  padding: 0.3rem 0.5rem;
+  border-radius: 6px;
+}
+
+.navLink:hover {
+  color: var(--text);
+  background: var(--surface-muted);
+}
+
+.navLink[aria-current='page'] {
+  color: var(--accent);
+}
+
 /* Phones: brand + quota on the first row, the search form gets a full-width row of its own. */
 @media (max-width: 640px) {
   .brand {

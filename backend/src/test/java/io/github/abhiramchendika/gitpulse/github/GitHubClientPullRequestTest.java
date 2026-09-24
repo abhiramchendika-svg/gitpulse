@@ -136,6 +136,49 @@ class GitHubClientPullRequestTest {
   }
 
   @Test
+  void getCommit_parsesChangedFilesIncludingRenames() {
+    server
+        .expect(requestTo(BASE + "/repos/o/r/commits/abc1234"))
+        .andRespond(
+            withSuccess(
+                """
+                {"sha":"abc1234","html_url":"h",
+                 "commit":{"author":{"name":"M","date":"2026-09-01T00:00:00Z"},"message":"x"},
+                 "author":{"login":"mona","id":1,"type":"User"},"parents":[{"sha":"p"}],
+                 "stats":{"total":12,"additions":10,"deletions":2},
+                 "files":[
+                   {"filename":"src/New.java","status":"renamed","additions":1,"deletions":1,
+                    "changes":2,"previous_filename":"src/Old.java"},
+                   {"filename":"README.md","status":"modified","additions":9,"deletions":1,
+                    "changes":10}]}
+                """,
+                MediaType.APPLICATION_JSON));
+
+    var detail = client.getCommit("o", "r", "abc1234");
+
+    assertThat(detail.files()).hasSize(2);
+    assertThat(detail.files().getFirst().previousFilename()).isEqualTo("src/Old.java");
+    assertThat(detail.files().get(1).additions()).isEqualTo(9);
+  }
+
+  @Test
+  void getCommit_rejectsSomethingThatIsNotASha() {
+    assertThatThrownBy(() -> client.getCommit("o", "r", "../../users/x"))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
+  void countContributors_readsTheLastPage() {
+    HttpHeaders link = new HttpHeaders();
+    link.set(HttpHeaders.LINK, "<" + BASE + "/repos/o/r/contributors?page=131>; rel=\"last\"");
+    server
+        .expect(requestTo(BASE + "/repos/o/r/contributors?per_page=1"))
+        .andRespond(withSuccess("[{}]", MediaType.APPLICATION_JSON).headers(link));
+
+    assertThat(client.countContributors("o", "r")).isEqualTo(131);
+  }
+
+  @Test
   void countPullRequests_emptyList_isZero() {
     server
         .expect(requestTo(PULLS + "?per_page=1&state=closed"))

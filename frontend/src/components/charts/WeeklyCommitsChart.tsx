@@ -5,13 +5,19 @@ import styles from './charts.module.css'
 
 interface WeeklyCommitsChartProps {
   weekly: { weekStart: string; commits: number }[]
+  /**
+   * Fix the top of the y-axis. Charts shown side by side must share it: with separate scales a
+   * quiet repository's bars would look as tall as a busy one's.
+   */
+  yMax?: number
+  height?: number
 }
 
 /**
  * Commits per week as columns: change over time for a single series. One hue, no legend (the card
  * title names the series), recessive hairline grid, hover tooltip per column, and a table view.
  */
-export function WeeklyCommitsChart({ weekly }: WeeklyCommitsChartProps) {
+export function WeeklyCommitsChart({ weekly, yMax, height = 220 }: WeeklyCommitsChartProps) {
   const total = weekly.reduce((sum, w) => sum + w.commits, 0)
   const peak = weekly.reduce((best, w) => (w.commits > best.commits ? w : best), weekly[0])
 
@@ -26,7 +32,7 @@ export function WeeklyCommitsChart({ weekly }: WeeklyCommitsChartProps) {
             : ''
         }.`}
       >
-        <ResponsiveContainer width="100%" height={220}>
+        <ResponsiveContainer width="100%" height={height}>
           <BarChart data={weekly} margin={{ top: 8, right: 4, bottom: 0, left: -12 }}>
             <CartesianGrid vertical={false} stroke="var(--grid)" />
             <XAxis
@@ -39,6 +45,7 @@ export function WeeklyCommitsChart({ weekly }: WeeklyCommitsChartProps) {
             />
             <YAxis
               allowDecimals={false}
+              domain={yMax === undefined ? undefined : [0, yMax]}
               tick={{ fill: 'var(--text-muted)', fontSize: 12 }}
               tickLine={false}
               axisLine={false}

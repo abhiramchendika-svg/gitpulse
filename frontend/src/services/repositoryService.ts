@@ -1,7 +1,9 @@
 import type {
   ActivityResponse,
   CommitAnalyticsResponse,
+  ComparisonResponse,
   ContributorAnalyticsResponse,
+  FileActivityResponse,
   IssueAnalyticsResponse,
   LanguageResponse,
   PullRequestAnalyticsResponse,
@@ -63,6 +65,23 @@ export function fetchIssues(
 
 export function fetchActivity(ref: RepoRef, signal?: AbortSignal): Promise<ActivityResponse> {
   return getJson(`${base(ref)}/activity`, signal)
+}
+
+/** Expensive: one GitHub request per sampled commit (unless cached). Only call on demand. */
+export function fetchFileActivity(
+  ref: RepoRef,
+  signal?: AbortSignal,
+): Promise<FileActivityResponse> {
+  return getJson(`${base(ref)}/files`, signal)
+}
+
+export function fetchComparison(
+  a: RepoRef,
+  b: RepoRef,
+  signal?: AbortSignal,
+): Promise<ComparisonResponse> {
+  const repos = `${a.owner}/${a.repo},${b.owner}/${b.repo}`
+  return getJson(`/api/v1/compare?repos=${encodeURIComponent(repos)}`, signal)
 }
 
 export function fetchContributors(

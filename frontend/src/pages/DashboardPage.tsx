@@ -4,6 +4,7 @@ import { Card } from '../components/Card'
 import { CommitActivitySection } from '../components/CommitActivitySection'
 import { ContributorsSection } from '../components/ContributorsSection'
 import { ErrorNotice } from '../components/ErrorNotice'
+import { FileActivitySection } from '../components/FileActivitySection'
 import { FilterBar } from '../components/FilterBar'
 import { IssuesSection } from '../components/IssuesSection'
 import { LanguagesSection } from '../components/LanguagesSection'
@@ -113,6 +114,15 @@ export function DashboardPage({ repo, range, excludeBots, onFiltersChange }: Das
           ))}
         </div>
       </section>
+
+      {overview.data && (
+        <section className={styles.group} aria-labelledby="files-heading">
+          <div className={styles.groupHeader}>
+            <h2 id="files-heading">Files</h2>
+          </div>
+          <FileActivitySection repo={repo} repoKey={repoKey} />
+        </section>
+      )}
     </div>
   )
 }

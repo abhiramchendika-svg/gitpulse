@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { rangeToSince, readUrlState } from './useUrlState'
+import { rangeToSince, readUrlState, toSearch } from './useUrlState'
 
 describe('readUrlState', () => {
   it('reads repo, range and bot filter', () => {
@@ -7,6 +7,7 @@ describe('readUrlState', () => {
       repo: { owner: 'facebook', repo: 'react' },
       range: '90d',
       excludeBots: true,
+      compare: null,
     })
   })
 
@@ -15,7 +16,37 @@ describe('readUrlState', () => {
       repo: null,
       range: '1y',
       excludeBots: false,
+      compare: null,
     })
+  })
+
+  it('reads a comparison', () => {
+    expect(readUrlState('?compare=facebook/react,vuejs/core').compare).toEqual([
+      { owner: 'facebook', repo: 'react' },
+      { owner: 'vuejs', repo: 'core' },
+    ])
+  })
+
+  it('treats an empty or incomplete comparison as the empty compare form', () => {
+    expect(readUrlState('?compare=').compare).toEqual([])
+    expect(readUrlState('?compare=facebook/react').compare).toEqual([])
+    expect(readUrlState('?compare=facebook/react,../x').compare).toEqual([])
+  })
+})
+
+describe('toSearch', () => {
+  it('writes a comparison without dashboard parameters', () => {
+    expect(
+      toSearch({
+        repo: { owner: 'a', repo: 'b' },
+        range: '90d',
+        excludeBots: true,
+        compare: [
+          { owner: 'facebook', repo: 'react' },
+          { owner: 'vuejs', repo: 'core' },
+        ],
+      }),
+    ).toBe('?compare=facebook%2Freact%2Cvuejs%2Fcore')
   })
 })
 

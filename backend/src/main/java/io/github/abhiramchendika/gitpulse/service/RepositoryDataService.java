@@ -1,5 +1,6 @@
 package io.github.abhiramchendika.gitpulse.service;
 
+import io.github.abhiramchendika.gitpulse.analysis.model.CommitFiles;
 import io.github.abhiramchendika.gitpulse.analysis.model.CommitRecord;
 import io.github.abhiramchendika.gitpulse.analysis.model.ContributorLineStats;
 import io.github.abhiramchendika.gitpulse.analysis.model.ContributorRecord;
@@ -14,6 +15,7 @@ import io.github.abhiramchendika.gitpulse.github.exception.GitHubEmptyRepository
 import io.github.abhiramchendika.gitpulse.github.exception.GitHubNotFoundException;
 import io.github.abhiramchendika.gitpulse.github.exception.GitHubRateLimitException;
 import io.github.abhiramchendika.gitpulse.github.model.GitHubCommit;
+import io.github.abhiramchendika.gitpulse.github.model.GitHubCommitDetail;
 import io.github.abhiramchendika.gitpulse.github.model.GitHubContributor;
 import io.github.abhiramchendika.gitpulse.github.model.GitHubContributorStats;
 import io.github.abhiramchendika.gitpulse.github.model.GitHubIssue;
@@ -49,12 +51,20 @@ public class RepositoryDataService {
 
   static final int MAX_HEADLINE_LENGTH = 200;
 
+  /** GitHub's cap on files listed in one commit's detail response. */
+  static final int MAX_FILES_PER_COMMIT = 300;
+
   private final GitHubClient gitHubClient;
   private final AnalysisProperties properties;
 
   public RepositoryDataService(GitHubClient gitHubClient, AnalysisProperties properties) {
     this.gitHubClient = gitHubClient;
     this.properties = properties;
+  }
+
+  /** Whether GitHub requests carry a token (affects how much work is affordable). Not cached. */
+  public boolean authenticated() {
+    return gitHubClient.isAuthenticated();
   }
 
   @Cacheable("repositories")
@@ -191,6 +201,57 @@ public class RepositoryDataService {
             .toList(),
         oldest,
         page.truncated());
+  }
+
+  /**
+   * The files one commit changed. Cached for 24 hours (see {@code CacheConfig}): a SHA identifies
+   * immutable content, so the only reason to expire it at all is memory.
+   */
+  @Cacheable(value = "commitDetails", key = "#ref.fullName() + '@' + #sha")
+  public CommitFiles commitFiles(RepositoryRef ref, String sha) {
+    GitHubCommitDetail detail =
+        onRepository(ref, () -> gitHubClient.getCommit(ref.owner(), ref.repo(), sha));
+    CommitRecord header =
+        toCommitRecord(
+            new GitHubCommit(
+                detail.sha(),
+                detail.htmlUrl(),
+                detail.commit(),
+                detail.author(),
+                detail.parents()));
+    List<CommitFiles.FileChange> files =
+        detail.files() == null
+            ? List.of()
+            : detail.files().stream()
+                .map(
+                    f ->
+                        new CommitFiles.FileChange(
+                            f.filename(),
+                            f.previousFilename(),
+                            f.status(),
+                            f.additions(),
+                            f.deletions()))
+                .toList();
+    return new CommitFiles(
+        detail.sha(),
+        header == null ? "unknown" : header.authorKey(),
+        header == null ? Instant.EPOCH : header.authoredAt(),
+        files,
+        files.size() >= MAX_FILES_PER_COMMIT);
+  }
+
+  /**
+   * Contributors with a linked account, in one request; null when GitHub will not list them (very
+   * large repositories answer 403) or reports no total.
+   */
+  @Cacheable(value = "counts", key = "{#root.methodName, #ref}", unless = "#result == null")
+  public Long contributorCount(RepositoryRef ref) {
+    try {
+      return onRepository(ref, () -> gitHubClient.countContributors(ref.owner(), ref.repo()));
+    } catch (GitHubApiException e) {
+      log.info("Contributor count unavailable for {}: {}", ref.fullName(), e.getMessage());
+      return null;
+    }
   }
 
   // The count methods share one cache. Spring's default key is only the method arguments, which

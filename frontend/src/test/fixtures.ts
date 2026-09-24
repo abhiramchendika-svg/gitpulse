@@ -1,7 +1,10 @@
 import type {
   ActivityResponse,
   CommitAnalyticsResponse,
+  ComparisonSummary,
   ContributorAnalyticsResponse,
+  FileActivityResponse,
+  FileStat,
   IssueAnalyticsResponse,
   LanguageResponse,
   PullRequestAnalyticsResponse,
@@ -267,5 +270,74 @@ export function activity(partial = false): ActivityResponse {
       issuesClosedLast90Days: 1,
       issuesPartial: false,
     },
+  }
+}
+
+export function fileActivity(authenticated = false): FileActivityResponse {
+  const file = (path: string, commits: number, churn: number): FileStat => ({
+    path,
+    commits,
+    additions: churn - 1,
+    deletions: 1,
+    churn,
+    distinctAuthors: 2,
+    lastChangedAt: '2026-09-20T10:00:00Z',
+    deleted: false,
+  })
+  return {
+    repository: 'octocat/hello-world',
+    meta: {
+      generatedAt: '2026-09-25T12:00:00Z',
+      requestedSample: 20,
+      sampleLimit: authenticated ? 300 : 20,
+      authenticated,
+      candidateCommits: 55,
+      mergeCommitsSkipped: 2,
+    },
+    statistics: {
+      commitsAnalyzed: 20,
+      sampleFrom: '2026-03-07T00:00:00Z',
+      sampleTo: '2026-09-20T10:00:00Z',
+      filesTouched: 3,
+      commitsWithTruncatedFiles: 0,
+      mostFrequentlyChanged: [file('src/main/App.java', 7, 30), file('README.md', 4, 10)],
+      highestChurn: [file('src/test/BigTest.java', 2, 500)],
+      directories: [{ path: 'src/main', commits: 7, filesTouched: 1, churn: 30 }],
+      recentlyChanged: [file('README.md', 4, 10)],
+    },
+  }
+}
+
+export function comparisonSummary(fullName: string, weeklyCommits: number[]): ComparisonSummary {
+  return {
+    fullName,
+    htmlUrl: `https://github.com/${fullName}`,
+    description: `About ${fullName}`,
+    stars: 1200,
+    forks: 30,
+    watchers: 5,
+    openIssuesAndPullRequests: 2,
+    primaryLanguage: 'Java',
+    topLanguages: [{ name: 'Java', bytes: 90, percent: 90 }],
+    license: 'MIT',
+    createdAt: '2016-01-01T00:00:00Z',
+    ageYears: 10.7,
+    pushedAt: '2026-09-20T00:00:00Z',
+    archived: false,
+    contributors: null,
+    commits: {
+      total: weeklyCommits.reduce((a, b) => a + b, 0),
+      averagePerWeek: 1.5,
+      activeWeeks: weeklyCommits.filter((c) => c > 0).length,
+      totalWeeks: weeklyCommits.length,
+      distinctAuthors: 3,
+      truncated: false,
+      since: '2025-09-26T00:00:00Z',
+    },
+    weekly: weeklyCommits.map((commits, i) => ({
+      weekStart: `2026-09-${String(1 + i * 7).padStart(2, '0')}`,
+      commits,
+    })),
+    activity: activity().indicators,
   }
 }

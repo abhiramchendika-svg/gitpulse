@@ -31,6 +31,7 @@ interface RouteOverrides {
   pullRequests?: () => Response
   issues?: () => Response
   activity?: () => Response
+  files?: () => Response
 }
 
 function happyRoutes(overrides: RouteOverrides = {}): Route {
@@ -50,6 +51,8 @@ function happyRoutes(overrides: RouteOverrides = {}): Route {
         return overrides.issues?.() ?? Response.json(fx.issues())
       case `${REPO_BASE}/activity`:
         return overrides.activity?.() ?? Response.json(fx.activity())
+      case `${REPO_BASE}/files`:
+        return overrides.files?.() ?? Response.json(fx.fileActivity())
     }
   }
 }
@@ -68,6 +71,7 @@ describe('App', () => {
   // measuring module transformation time against Testing Library's 1s wait.
   beforeAll(async () => {
     await import('./pages/DashboardPage')
+    await import('./pages/ComparePage')
   })
 
   it('shows the landing page with backend status before a repository is chosen', async () => {
@@ -291,6 +295,79 @@ describe('App', () => {
     })
     await waitFor(() => expect(window.location.search).toBe('?repo=octocat%2Fhello-world'))
     expect(await screen.findByRole('link', { name: 'octocat/hello-world' })).toBeInTheDocument()
+  })
+
+  it('analyses file activity only when asked, stating the cost first', async () => {
+    const fetchMock = mockBackend(happyRoutes())
+    render(<App />)
+    await analyse('octocat/hello-world')
+    await screen.findByRole('heading', { name: 'Commits per week' })
+
+    // Nothing expensive has been requested yet.
+    expect(requested(fetchMock, '/files')).toHaveLength(0)
+    expect(screen.getByText(/one GitHub request per commit analysed/)).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Analyse recent commits' }))
+
+    expect(await screen.findByText(/The 20 most recent commits/)).toBeInTheDocument()
+    expect(requested(fetchMock, '/files')).toHaveLength(1)
+    const files = screen.getByRole('region', { name: 'File activity' })
+    // File name first, directory de-emphasised, full path on hover.
+    expect(within(files).getAllByTitle('src/main/App.java')[0]).toHaveTextContent('App.java')
+    expect(within(files).getByText('+499 −1')).toBeInTheDocument()
+    expect(
+      within(files).getByText(/Limited to 20 commits because the backend has no/),
+    ).toBeVisible()
+  })
+
+  it('compares two repositories side by side on a shared scale', async () => {
+    const fetchMock = mockBackend((url) =>
+      url.pathname === '/api/v1/compare'
+        ? Response.json({
+            generatedAt: '2026-09-25T12:00:00Z',
+            repositories: [
+              fx.comparisonSummary('facebook/react', [2, 12]),
+              fx.comparisonSummary('vuejs/core', [1, 3]),
+            ],
+          })
+        : undefined,
+    )
+    render(<App />)
+
+    await userEvent.click(screen.getByRole('link', { name: 'Compare' }))
+    // The compare page is lazy-loaded: wait for its two inputs to appear.
+    await screen.findByRole('heading', { name: 'Compare two repositories' })
+    const inputs = screen.getAllByPlaceholderText('owner/repo or GitHub URL')
+    // [0] is the header search box.
+    await userEvent.type(inputs[1], 'facebook/react')
+    await userEvent.type(inputs[2], 'https://github.com/vuejs/core')
+    await userEvent.click(screen.getByRole('button', { name: 'Compare' }))
+
+    const table = await screen.findByRole('table', { name: 'Comparison of two repositories' })
+    expect(within(table).getByRole('link', { name: 'facebook/react' })).toBeInTheDocument()
+    expect(within(table).getByRole('link', { name: 'vuejs/core' })).toBeInTheDocument()
+    // Unavailable data is labelled, not shown as 0.
+    expect(within(table).getAllByText('Unavailable')).toHaveLength(2)
+    expect(within(table).getAllByText('14').length + within(table).getAllByText('4').length).toBe(2)
+    expect(requested(fetchMock, '/api/v1/compare').at(-1)).toContain(
+      encodeURIComponent('facebook/react,vuejs/core'),
+    )
+    expect(window.location.search).toBe('?compare=facebook%2Freact%2Cvuejs%2Fcore')
+    expect(screen.getAllByText('Both charts use the same scale')).toHaveLength(2)
+  })
+
+  it('rejects comparing a repository with itself without calling the backend', async () => {
+    const fetchMock = mockBackend(() => undefined)
+    window.history.replaceState(null, '', '/?compare=')
+    render(<App />)
+
+    const inputs = await screen.findAllByPlaceholderText('owner/repo or GitHub URL')
+    await userEvent.type(inputs[1], 'facebook/react')
+    await userEvent.type(inputs[2], 'Facebook/React')
+    await userEvent.click(screen.getByRole('button', { name: 'Compare' }))
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Choose two different repositories.')
+    expect(requested(fetchMock, '/compare')).toHaveLength(0)
   })
 
   it('opens the dashboard straight from a shared link', async () => {

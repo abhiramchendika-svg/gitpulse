@@ -3,6 +3,7 @@ package io.github.abhiramchendika.gitpulse.api;
 import io.github.abhiramchendika.gitpulse.api.dto.ActivityResponse;
 import io.github.abhiramchendika.gitpulse.api.dto.CommitAnalyticsResponse;
 import io.github.abhiramchendika.gitpulse.api.dto.ContributorAnalyticsResponse;
+import io.github.abhiramchendika.gitpulse.api.dto.FileActivityResponse;
 import io.github.abhiramchendika.gitpulse.api.dto.IssueAnalyticsResponse;
 import io.github.abhiramchendika.gitpulse.api.dto.LanguageResponse;
 import io.github.abhiramchendika.gitpulse.api.dto.PullRequestAnalyticsResponse;
@@ -10,10 +11,13 @@ import io.github.abhiramchendika.gitpulse.api.dto.RepositoryOverviewResponse;
 import io.github.abhiramchendika.gitpulse.service.ActivityService;
 import io.github.abhiramchendika.gitpulse.service.CommitAnalyticsService;
 import io.github.abhiramchendika.gitpulse.service.ContributorAnalyticsService;
+import io.github.abhiramchendika.gitpulse.service.FileActivityService;
 import io.github.abhiramchendika.gitpulse.service.IssueAnalyticsService;
 import io.github.abhiramchendika.gitpulse.service.PullRequestAnalyticsService;
 import io.github.abhiramchendika.gitpulse.service.RepositoryRef;
 import io.github.abhiramchendika.gitpulse.service.RepositoryService;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
 import java.time.LocalDate;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -40,6 +44,7 @@ public class RepositoryController {
   private final PullRequestAnalyticsService pullRequestAnalyticsService;
   private final IssueAnalyticsService issueAnalyticsService;
   private final ActivityService activityService;
+  private final FileActivityService fileActivityService;
 
   public RepositoryController(
       RepositoryService repositoryService,
@@ -47,13 +52,15 @@ public class RepositoryController {
       ContributorAnalyticsService contributorAnalyticsService,
       PullRequestAnalyticsService pullRequestAnalyticsService,
       IssueAnalyticsService issueAnalyticsService,
-      ActivityService activityService) {
+      ActivityService activityService,
+      FileActivityService fileActivityService) {
     this.repositoryService = repositoryService;
     this.commitAnalyticsService = commitAnalyticsService;
     this.contributorAnalyticsService = contributorAnalyticsService;
     this.pullRequestAnalyticsService = pullRequestAnalyticsService;
     this.issueAnalyticsService = issueAnalyticsService;
     this.activityService = activityService;
+    this.fileActivityService = fileActivityService;
   }
 
   @GetMapping
@@ -113,6 +120,20 @@ public class RepositoryController {
           LocalDate until,
       @RequestParam(defaultValue = "false") boolean excludeBots) {
     return issueAnalyticsService.analyze(new RepositoryRef(owner, repo), since, until, excludeBots);
+  }
+
+  /**
+   * Most-changed files and directories in a sample of recent commits.
+   *
+   * @param sample commits to analyse; costs one GitHub request each unless cached, and is capped by
+   *     the server (lower without a GitHub token)
+   */
+  @GetMapping("/files")
+  public FileActivityResponse files(
+      @PathVariable @Pattern(regexp = GitHubNames.OWNER) String owner,
+      @PathVariable @Pattern(regexp = GitHubNames.REPO) String repo,
+      @RequestParam(required = false) @Min(1) @Max(1000) Integer sample) {
+    return fileActivityService.analyze(new RepositoryRef(owner, repo), sample);
   }
 
   /** Factual indicators for the last 30/90 days; no parameters, no score. */

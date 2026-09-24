@@ -46,15 +46,17 @@ GitHub data is cached in memory for 10 minutes, so repeated requests (including 
 parameters over the same data, e.g. `excludeBots`) cost no GitHub quota. Approximate GitHub
 requests on a cold cache:
 
-| Endpoint      | GitHub requests                                                                |
-| ------------- | ------------------------------------------------------------------------------ |
-| overview      | 1                                                                              |
-| languages     | 1                                                                              |
-| commits       | 1 per 100 commits in the window (max 10) + 1 for the all-time count            |
-| contributors  | 1 per 100 contributors (max 5) + 1 for line statistics                         |
-| pull-requests | 1 per 100 pull requests (max 5, stops early) + 2 counts + 1 Search API request |
-| issues        | 1 per 100 issues and PRs (max 5, stops early) + 1 count + 1 Search API request |
-| activity      | usually 0: it reuses the cached default-window data                            |
+| Endpoint      | GitHub requests                                                                           |
+| ------------- | ----------------------------------------------------------------------------------------- |
+| overview      | 1                                                                                         |
+| languages     | 1                                                                                         |
+| commits       | 1 per 100 commits in the window (max 10) + 1 for the all-time count                       |
+| contributors  | 1 per 100 contributors (max 5) + 1 for line statistics                                    |
+| pull-requests | 1 per 100 pull requests (max 5, stops early) + 2 counts + 1 Search API request            |
+| issues        | 1 per 100 issues and PRs (max 5, stops early) + 1 count + 1 Search API request            |
+| activity      | usually 0: it reuses the cached default-window data                                       |
+| files         | 1 per sampled commit (20 anonymous, up to 300 with a token); cached 24 h by SHA           |
+| compare       | the sum of each repository's overview, languages, commits, contributor count and activity |
 
 The Search API has its own, smaller limit (10 requests/minute anonymous, 30 with a token). When it
 is exhausted, counts that depend on it are returned as `null` and the rest of the response is
@@ -391,3 +393,99 @@ No parameters. Factual indicators for the last 30/90 days; there is no score.
   }
 }
 ```
+
+## `GET /api/v1/repositories/{owner}/{repo}/files`
+
+Most-changed files and directories in a sample of recent commits. **Costs one GitHub request per
+sampled commit** (unless cached), so clients should call it only on demand.
+
+| Query param | Type    | Default                              | Rules                                   |
+| ----------- | ------- | ------------------------------------ | --------------------------------------- |
+| `sample`    | integer | 20 without a token, 100 with a token | 1–1000; capped by the server (20 / 300) |
+
+```json
+{
+  "repository": "spring-projects/spring-petclinic",
+  "meta": {
+    "generatedAt": "2026-09-24T20:23:12Z",
+    "requestedSample": 20,
+    "sampleLimit": 20,
+    "authenticated": false,
+    "candidateCommits": 55,
+    "mergeCommitsSkipped": 2
+  },
+  "statistics": {
+    "commitsAnalyzed": 20,
+    "sampleFrom": "2026-03-07T17:53:21Z",
+    "sampleTo": "2026-08-19T13:20:54Z",
+    "filesTouched": 47,
+    "commitsWithTruncatedFiles": 0,
+    "mostFrequentlyChanged": [
+      {
+        "path": "README.md",
+        "commits": 4,
+        "additions": 12,
+        "deletions": 5,
+        "churn": 17,
+        "distinctAuthors": 3,
+        "lastChangedAt": "2026-08-19T13:20:54Z",
+        "deleted": false
+      }
+    ],
+    "highestChurn": ["… same shape …"],
+    "directories": [
+      {
+        "path": "src/test/java/org/springframework/samples/petclinic/owner",
+        "commits": 7,
+        "filesTouched": 5,
+        "churn": 160
+      }
+    ],
+    "recentlyChanged": ["… same shape …"]
+  }
+}
+```
+
+Errors: `400` (bad name or `sample` out of range), `404`, `429`, `503`.
+
+## `GET /api/v1/compare?repos={owner}/{repo},{owner}/{repo}`
+
+Side-by-side facts for exactly two different repositories (fetched in parallel). No score.
+
+```bash
+curl "http://localhost:8080/api/v1/compare?repos=spring-projects/spring-petclinic,spring-guides/gs-rest-service"
+```
+
+```json
+{
+  "generatedAt": "2026-09-24T20:24:00Z",
+  "repositories": [
+    {
+      "fullName": "spring-projects/spring-petclinic",
+      "stars": 9539,
+      "forks": 30621,
+      "contributors": 131,
+      "ageYears": 13.7,
+      "primaryLanguage": "CSS",
+      "topLanguages": [{ "name": "CSS", "bytes": 156750, "percent": 62.7 }],
+      "license": "Apache-2.0",
+      "commits": {
+        "total": 52,
+        "averagePerWeek": 1.0,
+        "activeWeeks": 25,
+        "totalWeeks": 53,
+        "distinctAuthors": 22,
+        "truncated": false,
+        "since": "2025-09-25T00:00:00Z"
+      },
+      "weekly": [{ "weekStart": "2025-09-22", "commits": 1 }],
+      "activity": { "commitsLast30Days": 0, "commitsLast90Days": 8, "…": "…" },
+      "…": "…"
+    },
+    { "fullName": "spring-guides/gs-rest-service", "…": "…" }
+  ]
+}
+```
+
+Errors: `400 INVALID_INPUT` (not exactly two, invalid, or identical repositories),
+`404 REPOSITORY_NOT_FOUND` (the detail names the missing repository), `429`, `503`.

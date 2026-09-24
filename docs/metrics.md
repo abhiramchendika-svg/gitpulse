@@ -174,3 +174,39 @@ Fixed look-back periods ending at the time of the request. **There is no overall
 
 The activity endpoint reuses the cached samples of the default one-year views, so it normally
 costs no extra GitHub requests.
+
+## File activity: `GET /api/v1/repositories/{owner}/{repo}/files`
+
+Based on a **sample of the most recent commits**, not the whole history: GitHub only lists changed
+files per commit (`GET /commits/{sha}`), so every sampled commit costs one request.
+
+- **Sample:** the newest non-merge commits of the last year (by commit date), at most 20 without a
+  GitHub token, 100 by default with one, 300 at most. Merge commits are skipped because GitHub
+  diffs a merge against its first parent, which would count the merged branch's files twice.
+- **Renames** within the sample are followed: changes made under an old path are credited to the
+  file's current path.
+- GitHub lists at most 300 files per commit; `commitsWithTruncatedFiles` counts commits that hit
+  that cap (their numbers are lower bounds).
+
+| Field                             | Definition                                                                                      |
+| --------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `mostFrequentlyChanged[].commits` | Sampled commits that changed the file ("change frequency").                                     |
+| `highestChurn[].churn`            | Lines added + lines deleted across the sample. High churn means much rewriting, not "bad code". |
+| `…distinctAuthors`                | Distinct commit authors who changed the file within the sample.                                 |
+| `…deleted`                        | The most recent sampled change removed the file.                                                |
+| `directories[].commits`           | Sampled commits changing at least one file **directly** in that directory ("" = root).          |
+| `recentlyChanged`                 | Files ordered by the author date of their latest sampled change.                                |
+
+Commit details are cached for 24 hours by repository and SHA (a SHA identifies immutable content),
+and are fetched at most 4 at a time to stay clear of GitHub's secondary rate limits.
+
+## Comparison: `GET /api/v1/compare?repos=a/b,c/d`
+
+The same facts for two repositories, computed exactly as on each repository's dashboard (it reuses
+those services and their caches): overview fields, top three languages, linked contributor count
+(`GET /contributors?per_page=1`, last page number; `null` when GitHub will not count them), commit
+statistics for the default one-year window, and the recent-activity indicators. `ageYears` is the
+time since the repository was created on GitHub, in years of 365.2425 days.
+
+There is **no score and no winner**. The dashboard charts both repositories' weekly commits on a
+**shared y-axis**; with separate scales a quiet repository would look as busy as an active one.
