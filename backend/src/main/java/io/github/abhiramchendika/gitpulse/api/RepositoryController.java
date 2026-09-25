@@ -3,11 +3,13 @@ package io.github.abhiramchendika.gitpulse.api;
 import io.github.abhiramchendika.gitpulse.api.dto.ActivityResponse;
 import io.github.abhiramchendika.gitpulse.api.dto.CommitAnalyticsResponse;
 import io.github.abhiramchendika.gitpulse.api.dto.ContributorAnalyticsResponse;
+import io.github.abhiramchendika.gitpulse.api.dto.ExplanationResponse;
 import io.github.abhiramchendika.gitpulse.api.dto.FileActivityResponse;
 import io.github.abhiramchendika.gitpulse.api.dto.IssueAnalyticsResponse;
 import io.github.abhiramchendika.gitpulse.api.dto.LanguageResponse;
 import io.github.abhiramchendika.gitpulse.api.dto.PullRequestAnalyticsResponse;
 import io.github.abhiramchendika.gitpulse.api.dto.RepositoryOverviewResponse;
+import io.github.abhiramchendika.gitpulse.explanation.ExplanationService;
 import io.github.abhiramchendika.gitpulse.service.ActivityService;
 import io.github.abhiramchendika.gitpulse.service.CommitAnalyticsService;
 import io.github.abhiramchendika.gitpulse.service.ContributorAnalyticsService;
@@ -23,6 +25,7 @@ import java.time.LocalDate;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -45,6 +48,7 @@ public class RepositoryController {
   private final IssueAnalyticsService issueAnalyticsService;
   private final ActivityService activityService;
   private final FileActivityService fileActivityService;
+  private final ExplanationService explanationService;
 
   public RepositoryController(
       RepositoryService repositoryService,
@@ -53,7 +57,8 @@ public class RepositoryController {
       PullRequestAnalyticsService pullRequestAnalyticsService,
       IssueAnalyticsService issueAnalyticsService,
       ActivityService activityService,
-      FileActivityService fileActivityService) {
+      FileActivityService fileActivityService,
+      ExplanationService explanationService) {
     this.repositoryService = repositoryService;
     this.commitAnalyticsService = commitAnalyticsService;
     this.contributorAnalyticsService = contributorAnalyticsService;
@@ -61,6 +66,7 @@ public class RepositoryController {
     this.issueAnalyticsService = issueAnalyticsService;
     this.activityService = activityService;
     this.fileActivityService = fileActivityService;
+    this.explanationService = explanationService;
   }
 
   @GetMapping
@@ -134,6 +140,23 @@ public class RepositoryController {
       @PathVariable @Pattern(regexp = GitHubNames.REPO) String repo,
       @RequestParam(required = false) @Min(1) @Max(1000) Integer sample) {
     return fileActivityService.analyze(new RepositoryRef(owner, repo), sample);
+  }
+
+  /**
+   * A short AI-written summary of the dashboard's numbers, verified against them. POST because each
+   * uncached call costs money: link prefetchers and crawlers never send POST requests. Takes the
+   * same window parameters as the windowed endpoints.
+   */
+  @PostMapping("/explanation")
+  public ExplanationResponse explanation(
+      @PathVariable @Pattern(regexp = GitHubNames.OWNER) String owner,
+      @PathVariable @Pattern(regexp = GitHubNames.REPO) String repo,
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+          LocalDate since,
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+          LocalDate until,
+      @RequestParam(defaultValue = "false") boolean excludeBots) {
+    return explanationService.explain(new RepositoryRef(owner, repo), since, until, excludeBots);
   }
 
   /** Factual indicators for the last 30/90 days; no parameters, no score. */

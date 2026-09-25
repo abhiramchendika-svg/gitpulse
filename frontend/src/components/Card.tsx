@@ -1,12 +1,13 @@
 import type { ReactNode } from 'react'
 import styles from './Card.module.css'
 
-export type Source = 'github' | 'calculated' | 'mixed'
+export type Source = 'github' | 'calculated' | 'mixed' | 'ai'
 
 const SOURCE_TEXT: Record<Source, string> = {
   github: 'Source: GitHub API',
   calculated: 'Calculated by GitPulse from GitHub data (formulas: docs/metrics.md)',
   mixed: 'GitHub API data; percentages calculated by GitPulse (docs/metrics.md)',
+  ai: 'Text written by AI (Claude, by Anthropic) from the numbers above, and checked against them. Not a metric.',
 }
 
 interface CardProps {

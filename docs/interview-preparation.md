@@ -85,6 +85,20 @@ duplicate the API. In the browser it's free and matches the screen exactly. For 
 protection against CSV injection: a commit message starting with `=` could run as a formula in
 Excel, so formula-like text gets a leading apostrophe.
 
+**You added AI. How do you know it doesn't make things up?**
+It can only rephrase numbers GitPulse already calculated. The model receives a fact sheet (ids
+and values, no names or free text) and must return JSON where each sentence lists the fact ids it
+uses. Before anything is shown, a verifier checks that every number in a sentence equals one of
+its cited facts and that there's no evaluative wording. Failing sentences are dropped, and if too
+few survive, nothing is shown. The honest limit: it can't prove a sentence uses a correct number
+with the right _meaning_, so each sentence shows its sources and the card says it isn't a metric.
+Cost is controlled with POST-only requests, a cache and an hourly cap.
+
+**Why not let the AI analyse the commits itself?**
+Commit messages are written by strangers, so sending them would let anyone put instructions in
+front of the model (prompt injection). The value-to-risk ratio of "summarise verified numbers" was
+much better, and a deterministic parser does commit categorisation without AI anyway.
+
 ### Java and Spring
 
 - **`@Cacheable` pitfall:** it works through a proxy, so a call from inside the same class skips
@@ -167,6 +181,18 @@ about two minutes each: **S**ituation, **T**ask, **A**ction, **R**esult.
   instead of reusing the single-repository one.
 - **Result / lesson:** read the migration notes of major versions; model optional fields as
   optional.
+
+### 5. A bug only a real browser could find
+
+- **Situation:** the AI summary is the only `POST` endpoint; all its tests passed.
+- **Task:** in the live check, clicking the button returned a bare `403` with no error body.
+- **Action:** a `curl` with an `Origin` header reproduced it: Spring's CORS filter. I had assumed
+  the Vite dev proxy makes requests same-origin, but it forwards the browser's `Origin` header,
+  and the CORS config allowed only `GET`. I allowed `POST`, fixed the misleading code comment, and
+  added a test that fails with the old setting and also checks that other origins are still
+  refused.
+- **Result / lesson:** unit tests only test what you think is true. An end-to-end check in a
+  real browser tests the assumptions.
 
 ### Other good topics
 

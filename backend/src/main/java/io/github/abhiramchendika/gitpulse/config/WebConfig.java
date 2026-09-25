@@ -7,9 +7,11 @@ import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
- * CORS for the API. In local development the Vite dev server proxies {@code /api}, so browsers see
- * a same-origin request and CORS is not involved; this allow-list matters only when the frontend is
- * served from a different origin.
+ * CORS for the API: only the configured frontend origins may call it from a browser.
+ *
+ * <p>This applies in local development too: the Vite dev server proxies {@code /api} but forwards
+ * the browser's {@code Origin} header, so the backend still sees a cross-origin request. POST is
+ * allowed for the one action that costs money (explanations); everything else is GET.
  */
 @Configuration(proxyBeanMethods = false)
 public class WebConfig implements WebMvcConfigurer {
@@ -25,6 +27,6 @@ public class WebConfig implements WebMvcConfigurer {
     registry
         .addMapping("/api/**")
         .allowedOrigins(allowedOrigins.toArray(String[]::new))
-        .allowedMethods("GET");
+        .allowedMethods("GET", "POST");
   }
 }

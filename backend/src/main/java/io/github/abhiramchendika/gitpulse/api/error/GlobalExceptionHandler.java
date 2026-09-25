@@ -1,5 +1,9 @@
 package io.github.abhiramchendika.gitpulse.api.error;
 
+import io.github.abhiramchendika.gitpulse.explanation.ExplanationLimitException;
+import io.github.abhiramchendika.gitpulse.explanation.ExplanationUnavailableException;
+import io.github.abhiramchendika.gitpulse.explanation.ExplanationsDisabledException;
+import io.github.abhiramchendika.gitpulse.explanation.UnreliableExplanationException;
 import io.github.abhiramchendika.gitpulse.github.exception.GitHubApiException;
 import io.github.abhiramchendika.gitpulse.github.exception.GitHubAuthenticationException;
 import io.github.abhiramchendika.gitpulse.github.exception.GitHubNotFoundException;
@@ -112,6 +116,45 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     log.warn("Unexpected GitHub response: HTTP {}", e.getStatus());
     return problem(
         HttpStatus.BAD_GATEWAY, ErrorCode.GITHUB_ERROR, "GitHub returned an unexpected response.");
+  }
+
+  @ExceptionHandler(ExplanationsDisabledException.class)
+  ResponseEntity<ProblemDetail> handleExplanationsDisabled(ExplanationsDisabledException e) {
+    return problem(
+        HttpStatus.SERVICE_UNAVAILABLE,
+        ErrorCode.AI_NOT_CONFIGURED,
+        "Explanations are not enabled on this server (no Anthropic API key is configured).");
+  }
+
+  @ExceptionHandler(ExplanationLimitException.class)
+  ResponseEntity<ProblemDetail> handleExplanationLimit(ExplanationLimitException e) {
+    ProblemDetail body =
+        body(
+            HttpStatus.TOO_MANY_REQUESTS,
+            ErrorCode.AI_LIMIT_REACHED,
+            "This server's hourly limit for explanations has been reached. Try again later.");
+    body.setProperty("resetAt", e.getResetAt());
+    Duration wait = Duration.between(Instant.now(), e.getResetAt());
+    HttpHeaders headers = new HttpHeaders();
+    headers.set(HttpHeaders.RETRY_AFTER, Long.toString(Math.max(0, wait.toSeconds())));
+    return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).headers(headers).body(body);
+  }
+
+  @ExceptionHandler(ExplanationUnavailableException.class)
+  ResponseEntity<ProblemDetail> handleExplanationUnavailable(ExplanationUnavailableException e) {
+    return problem(
+        HttpStatus.SERVICE_UNAVAILABLE,
+        ErrorCode.AI_UNAVAILABLE,
+        "The AI service is unavailable right now. The rest of the dashboard is unaffected.");
+  }
+
+  @ExceptionHandler(UnreliableExplanationException.class)
+  ResponseEntity<ProblemDetail> handleUnreliableExplanation(UnreliableExplanationException e) {
+    log.info("Explanation rejected: {}", e.getMessage());
+    return problem(
+        HttpStatus.BAD_GATEWAY,
+        ErrorCode.AI_UNRELIABLE,
+        "GitPulse could not produce an explanation that matches the numbers, so none is shown.");
   }
 
   /** Last resort: log the details server-side, return nothing internal to the client. */

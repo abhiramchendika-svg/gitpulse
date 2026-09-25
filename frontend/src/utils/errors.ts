@@ -17,6 +17,14 @@ export function describeError(error: ApiError): string {
       return 'GitHub is currently unreachable. Try again in a moment.'
     case 'GITHUB_AUTH_FAILED':
       return "The backend's GitHub token was rejected. Check GITHUB_TOKEN on the server."
+    case 'AI_LIMIT_REACHED': {
+      const when = error.resetAt ? ` Try again after ${formatTime(error.resetAt)}.` : ''
+      return `This server's hourly limit for AI explanations has been reached.${when}`
+    }
+    case 'AI_UNAVAILABLE':
+      return 'The AI service is unavailable right now. The rest of the dashboard is unaffected.'
+    case 'AI_UNRELIABLE':
+      return 'The AI answer did not match the numbers closely enough, so GitPulse is not showing it. You can try again.'
     default:
       return error.message || 'Something went wrong.'
   }

@@ -1,0 +1,41 @@
+.intro {
+  display: grid;
+  gap: 0.75rem;
+  justify-items: start;
+}
+
+.intro p {
+  margin: 0;
+  max-width: 46rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.result {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.sentences {
+  margin: 0;
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 0.6rem;
+  max-width: 50rem;
+}
+
+.sentences li {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.basedOn {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.muted {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}

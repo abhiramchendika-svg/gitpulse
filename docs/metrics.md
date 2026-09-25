@@ -232,3 +232,34 @@ ranking, score or "impact" number.
 
 `events` is `null` for **organizations**: their public event feed mixes many members' activity and
 would not describe the account itself.
+
+## AI explanation (not a metric)
+
+The optional "Plain-English summary" card is **text written by a language model** (Claude, by
+Anthropic), not a GitPulse metric. It introduces no new numbers: it may only restate facts that are
+defined elsewhere on this page. The UI labels it as AI-written.
+
+**Input.** A fact sheet: numbers GitPulse has already calculated for the selected window, each with
+an id (e.g. `commits.total`), a label and a value. Period lengths are included as facts (e.g.
+`window.days` = 365) so sentences can mention them. Excluded on purpose: any text written by people
+(logins, names, commit messages, titles, descriptions, topics) and counts that are only lower
+bounds (the "+" values in Recent activity).
+
+**Verification.** Each sentence the model returns must:
+
+1. cite at least one fact id, all of which exist;
+2. contain only numbers equal to a cited fact's value. Thousands separators are allowed, and so
+   is rounding to fewer decimal places (12.47 → 12.5 or 12). Other rounding (1,734 → "about
+   1,700"), calculated numbers (differences, ratios), and dates not given as facts all fail.
+   Ordinals such as "3rd" count as numbers;
+3. contain none of a list of evaluative words (e.g. healthy, productive, best, should, abandoned);
+4. be at most 300 characters. At most 8 sentences are kept.
+
+Failing sentences are removed and counted (`sentencesRemoved`). If fewer than 2 remain, nothing is
+shown (`AI_UNRELIABLE`).
+
+**Limits of the check.** It proves every number shown is one of GitPulse's numbers and that the
+sentence cites it. It cannot prove the sentence uses the number with exactly the right meaning
+(e.g. mixing up two counts that happen to be equal), and numbers written as words ("two") are not
+checked. That's why every sentence shows the facts it is based on, and the card says it is not a
+metric.

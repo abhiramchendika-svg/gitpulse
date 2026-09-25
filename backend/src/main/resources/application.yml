@@ -14,7 +14,7 @@ spring:
   cache:
     type: caffeine
     # commitDetails is configured separately (24h) in CacheConfig.
-    cache-names: repositories,languages,commits,commitCounts,contributors,contributorStats,pullRequests,issues,counts,users,userRepositories,userEvents
+    cache-names: repositories,languages,commits,commitCounts,contributors,contributorStats,pullRequests,issues,counts,users,userRepositories,userEvents,explanations
     # Each cache keeps at most 500 entries for 10 minutes: fresh enough for activity data,
     # and repeated dashboard loads cost zero GitHub requests.
     caffeine:
@@ -50,6 +50,18 @@ gitpulse:
     # than the window, so these caps only matter for very busy repositories.
     max-pull-request-pages: 5
     max-issue-pages: 5
+  ai:
+    # Optional "explain these numbers" feature. Empty = disabled (the UI hides the button).
+    # Each explanation is one paid Claude API call; see docs/architecture.md.
+    api-key: ${ANTHROPIC_API_KEY:}
+    base-url: https://api.anthropic.com
+    model: claude-opus-5
+    # Caps model calls (and so cost) for the whole instance. Cached answers don't count.
+    max-explanations-per-hour: ${GITPULSE_AI_MAX_PER_HOUR:20}
+    max-tokens: 8000
+    timeout: 60s
+    # Re-run a request on another model if a safety classifier declines it (server-side).
+    refusal-fallback: true
   file-activity:
     # One GitHub request per sampled commit (cached 24h by SHA). Anonymous access has only 60
     # requests per hour in total, so the sample is much smaller without a token.

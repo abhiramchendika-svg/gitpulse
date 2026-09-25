@@ -26,6 +26,7 @@
 		<java.version>21</java.version>
 		<spotless.version>2.44.5</spotless.version>
 		<google-java-format.version>1.27.0</google-java-format.version>
+		<anthropic-java.version>2.65.0</anthropic-java.version>
 	</properties>
 
 	<dependencies>
@@ -55,6 +56,12 @@
 			<!-- ... backed by Caffeine: in-memory, size-bounded, time-expiring. Version managed by Boot. -->
 			<groupId>com.github.ben-manes.caffeine</groupId>
 			<artifactId>caffeine</artifactId>
+		</dependency>
+		<!-- Optional "explain these numbers" feature; only used when ANTHROPIC_API_KEY is set. -->
+		<dependency>
+			<groupId>com.anthropic</groupId>
+			<artifactId>anthropic-java</artifactId>
+			<version>${anthropic-java.version}</version>
 		</dependency>
 
 		<dependency>

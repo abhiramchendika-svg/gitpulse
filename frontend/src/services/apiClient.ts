@@ -20,10 +20,19 @@ export class ApiError extends Error {
 }
 
 /** GET a same-origin JSON endpoint. Paths are relative (e.g. /api/v1/rate-limit). */
-export async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
+export function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
+  return requestJson('GET', path, signal)
+}
+
+/** POST (no body) to a same-origin JSON endpoint: used for actions that cost something. */
+export function postJson<T>(path: string, signal?: AbortSignal): Promise<T> {
+  return requestJson('POST', path, signal)
+}
+
+async function requestJson<T>(method: 'GET' | 'POST', path: string, signal?: AbortSignal) {
   let response: Response
   try {
-    response = await fetch(path, { headers: { Accept: 'application/json' }, signal })
+    response = await fetch(path, { method, headers: { Accept: 'application/json' }, signal })
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
       throw error

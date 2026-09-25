@@ -24,6 +24,9 @@ good the code is.
 5. **Respect the GitHub API budget.** Anonymous users get 60 requests per hour. Any change that
    adds GitHub requests must update the cost table in [docs/api.md](docs/api.md#caching-and-cost),
    cap pagination, and go through the cache. Tests never call the real GitHub API.
+6. **AI only restates verified numbers.** The optional AI summary may only rephrase facts
+   GitPulse calculated, and every number it writes is checked. Don't send GitHub-provided text
+   (names, messages, descriptions) to the model, and never call the paid API from tests.
 
 ## Getting set up
 

@@ -3,7 +3,7 @@
 **GitHub repository & commit analyzer.** GitPulse turns public GitHub activity (commits,
 contributors, languages, pull requests, issues) into factual, descriptive analytics.
 
-> **Status: early development (Phase 6 complete).** Analyse a repository (overview, activity,
+> **Status: early development (Phase 7 complete).** Analyse a repository (overview, activity,
 > commits, pull requests, issues, contributors, languages, file activity), compare two repositories,
 > or look at a GitHub user's public profile, and export any of it as JSON or CSV. See
 > [Roadmap](#roadmap).
@@ -32,6 +32,10 @@ contributors, languages, pull requests, issues) into factual, descriptive analyt
 - **Export:** a JSON report of any dashboard, profile or comparison, and CSV for every chart
   table and the contributor list. Runs in the browser, so it costs no GitHub requests; CSV
   files are protected against formula injection. Format: [docs/api.md](docs/api.md#exported-files).
+- **Optional plain-English summary** (off unless the server has an Anthropic API key): Claude
+  describes the dashboard's numbers, and GitPulse checks every number in the answer against
+  its own before showing it. Only numbers are sent, never names or text. Rules:
+  [docs/metrics.md](docs/metrics.md#ai-explanation-not-a-metric).
 - Every view is a shareable link (`?repo=owner/name&range=90d`), and every chart has a table
   view. Paste `owner/repo`, a username or any GitHub URL.
 
@@ -89,6 +93,8 @@ The header shows how much GitHub API quota the backend has left.
 | `GITHUB_TOKEN`                  | No       | _(none)_                | Raises GitHub's limit from 60 to 5,000 requests/hour |
 | `PORT`                          | No       | `8080`                  | Backend port                                         |
 | `GITPULSE_CORS_ALLOWED_ORIGINS` | No       | `http://localhost:5173` | Browser origins allowed to call the API              |
+| `ANTHROPIC_API_KEY`             | No       | _(none)_                | Enables the optional AI summary (paid per use)       |
+| `GITPULSE_AI_MAX_PER_HOUR`      | No       | `20`                    | Most AI calls per hour for the whole instance        |
 
 Variables can be set in the shell or in a `.env` file at the repository root (git-ignored).
 Use a **fine-grained, read-only, public-repositories** token. Never commit it.
@@ -109,6 +115,8 @@ Use a **fine-grained, read-only, public-repositories** token. Never commit it.
 | GET    | `/api/v1/repositories/{owner}/{repo}/files`         | File activity from recent commits (`sample`)      |
 | GET    | `/api/v1/users/{username}`                          | Public profile analysis                           |
 | GET    | `/api/v1/compare?repos=a/b,c/d`                     | Two repositories side by side                     |
+| GET    | `/api/v1/features`                                  | Optional features enabled on this server          |
+| POST   | `/api/v1/repositories/{owner}/{repo}/explanation`   | Optional AI summary, verified against the numbers |
 
 Full reference with examples: [docs/api.md](docs/api.md). Metric definitions:
 [docs/metrics.md](docs/metrics.md).
@@ -144,7 +152,7 @@ Formatting: `./mvnw spotless:apply` (Java, google-java-format) and `npm run form
 5. ✅ (5a) File activity, repository comparison, per-cache lifetimes, bounded parallel fetching
    · ✅ (5b) GitHub profile analysis
 6. ✅ Export (CSV/JSON) and open-source documentation
-7. Optional AI features (evaluated, not assumed)
+7. ✅ Optional AI summary, grounded in and verified against GitPulse's numbers
 
 ## Known limitations
 

@@ -178,6 +178,37 @@ Details that matter:
 **Trade-off:** an in-memory cache is per instance and lost on restart. For a single-instance tool
 that's fine. Running several instances would need a shared cache such as Redis.
 
+## Optional AI explanation
+
+A "Plain-English summary" card, off unless the server has `ANTHROPIC_API_KEY`. Package
+`explanation/`:
+
+```
+FactSheet ──▶ ExplanationPrompt ──▶ ExplanationModel ──▶ ExplanationVerifier ──▶ response
+(numbers only)   (rules + JSON)      (Claude via the       (numbers, fact ids,
+                                      Anthropic Java SDK)   wording, length)
+```
+
+- **Grounded input.** `FactSheet` turns the dashboard's analyses into id → value facts. Free text
+  from GitHub (names, commit messages, descriptions) is never sent. That removes the prompt-injection
+  surface and keeps the text about activity, not people.
+- **Structured output.** The model must answer in a JSON schema: sentences, each listing the fact
+  ids it uses. Effort is `low` (it's rephrasing, not reasoning); thinking stays at the model's
+  default (adaptive on Claude Opus 5).
+- **Verification.** Every number in a sentence must equal one of its cited facts. Evaluative
+  words are rejected. Failing sentences are dropped, and fewer than two survivors means nothing is
+  shown. Rules: [metrics.md](metrics.md#ai-explanation-not-a-metric).
+- **Cost control.** The request is `POST` (never prefetched) and only sent when the user clicks.
+  It's cached for 10 minutes. A sliding-window limiter (`HourlyLimiter`) allows 20 model calls
+  per hour per instance by default, counting failed calls too. GitHub data is fetched (and
+  GitHub errors raised) before any paid call.
+- **Failure handling.** Declined requests are retried server-side on another model
+  (`fallbacks: "default"`); refusals, truncated or malformed answers become `AI_UNRELIABLE`;
+  network, auth and rate-limit errors from Anthropic become `AI_UNAVAILABLE`. The rest of the
+  dashboard never depends on the AI.
+- **Testability.** `ExplanationModel` is an interface. Tests use a fake, and the real SDK client
+  is tested against a local stand-in HTTP server, so no test calls the paid API.
+
 ## Error handling
 
 Every failure becomes an [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) problem detail with a
@@ -252,16 +283,17 @@ JDK 21 and 25.
 
 ## Key decisions
 
-| Decision                            | Alternatives                     | Why                                                                                                                                                    |
-| ----------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| No database                         | PostgreSQL, H2                   | All data is re-derivable from GitHub; avoids storing data about people; zero setup                                                                     |
-| REST API v3                         | GraphQL API v4                   | GraphQL **requires** a token; REST works anonymously, so anyone can try GitPulse. REST counts requests, which is simpler to budget than GraphQL points |
-| Cache raw data, not results         | Cache final responses            | Different views over the same data are free; formulas can change without invalidation logic                                                            |
-| In-memory Caffeine                  | Redis                            | Single instance; no extra infrastructure. Redis is the upgrade path for scaling out                                                                    |
-| Page caps + truncation flag         | Fetch everything                 | Bounded cost per request; honest about coverage instead of silently incomplete                                                                         |
-| No conditional requests (ETags) yet | `If-None-Match` on every request | A `304` only avoids counting against the limit for authenticated requests; most users run without a token. Worth adding when tokens are common         |
-| Client-side export                  | `/export` endpoint               | No extra GitHub requests, no duplicate API, exact match with the screen                                                                                |
-| Descriptive metrics only            | Scores, rankings                 | Activity counts don't measure people; scores invite misuse. Enforced in CONTRIBUTING                                                                   |
+| Decision                              | Alternatives                     | Why                                                                                                                                                    |
+| ------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| No database                           | PostgreSQL, H2                   | All data is re-derivable from GitHub; avoids storing data about people; zero setup                                                                     |
+| REST API v3                           | GraphQL API v4                   | GraphQL **requires** a token; REST works anonymously, so anyone can try GitPulse. REST counts requests, which is simpler to budget than GraphQL points |
+| Cache raw data, not results           | Cache final responses            | Different views over the same data are free; formulas can change without invalidation logic                                                            |
+| In-memory Caffeine                    | Redis                            | Single instance; no extra infrastructure. Redis is the upgrade path for scaling out                                                                    |
+| Page caps + truncation flag           | Fetch everything                 | Bounded cost per request; honest about coverage instead of silently incomplete                                                                         |
+| No conditional requests (ETags) yet   | `If-None-Match` on every request | A `304` only avoids counting against the limit for authenticated requests; most users run without a token. Worth adding when tokens are common         |
+| Client-side export                    | `/export` endpoint               | No extra GitHub requests, no duplicate API, exact match with the screen                                                                                |
+| Optional AI: summarise, never compute | AI insights, AI chat, no AI      | A model can state wrong numbers fluently. So it only rephrases GitPulse's numbers, every number is checked, and it's off by default                    |
+| Descriptive metrics only              | Scores, rankings                 | Activity counts don't measure people; scores invite misuse. Enforced in CONTRIBUTING                                                                   |
 
 ## Known limits and next steps
 

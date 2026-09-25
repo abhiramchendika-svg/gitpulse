@@ -2,15 +2,25 @@ package io.github.abhiramchendika.gitpulse.api;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.github.abhiramchendika.gitpulse.analysis.LanguageStatistics;
+import io.github.abhiramchendika.gitpulse.api.dto.ExplanationResponse;
 import io.github.abhiramchendika.gitpulse.api.dto.LanguageResponse;
+import io.github.abhiramchendika.gitpulse.explanation.ExplanationLimitException;
+import io.github.abhiramchendika.gitpulse.explanation.ExplanationService;
+import io.github.abhiramchendika.gitpulse.explanation.ExplanationUnavailableException;
+import io.github.abhiramchendika.gitpulse.explanation.ExplanationsDisabledException;
+import io.github.abhiramchendika.gitpulse.explanation.Fact;
+import io.github.abhiramchendika.gitpulse.explanation.UnreliableExplanationException;
 import io.github.abhiramchendika.gitpulse.service.ActivityService;
 import io.github.abhiramchendika.gitpulse.service.CommitAnalyticsService;
 import io.github.abhiramchendika.gitpulse.service.ContributorAnalyticsService;
@@ -21,6 +31,8 @@ import io.github.abhiramchendika.gitpulse.service.PullRequestAnalyticsService;
 import io.github.abhiramchendika.gitpulse.service.RepositoryNotFoundException;
 import io.github.abhiramchendika.gitpulse.service.RepositoryRef;
 import io.github.abhiramchendika.gitpulse.service.RepositoryService;
+import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -43,6 +55,7 @@ class RepositoryControllerTest {
   @MockitoBean private IssueAnalyticsService issueAnalyticsService;
   @MockitoBean private ActivityService activityService;
   @MockitoBean private FileActivityService fileActivityService;
+  @MockitoBean private ExplanationService explanationService;
 
   @Test
   void files_passesSampleAndValidatesItsRange() throws Exception {
@@ -58,6 +71,99 @@ class RepositoryControllerTest {
     mockMvc
         .perform(get("/api/v1/repositories/octocat/hello/files").param("sample", "5000"))
         .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void explanation_isPostOnly_andPassesTheWindow() throws Exception {
+    RepositoryRef ref = new RepositoryRef("octocat", "hello");
+    when(explanationService.explain(ref, LocalDate.of(2026, 6, 27), null, true))
+        .thenReturn(
+            new ExplanationResponse(
+                "octocat/hello",
+                Instant.parse("2026-09-25T12:00:00Z"),
+                "claude-opus-5",
+                new ExplanationResponse.Window(
+                    Instant.parse("2026-06-27T00:00:00Z"),
+                    Instant.parse("2026-09-25T12:00:00Z"),
+                    true),
+                List.of(
+                    new ExplanationResponse.Sentence(
+                        "There were 240 commits.",
+                        List.of(new Fact("commits.total", "Commits", BigDecimal.valueOf(240))))),
+                0));
+
+    mockMvc
+        .perform(
+            post("/api/v1/repositories/octocat/hello/explanation")
+                .param("since", "2026-06-27")
+                .param("excludeBots", "true"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.sentences[0].text").value("There were 240 commits."))
+        .andExpect(jsonPath("$.sentences[0].basedOn[0].id").value("commits.total"))
+        .andExpect(jsonPath("$.sentences[0].basedOn[0].value").value(240));
+
+    // A GET (link prefetch, crawler) never triggers a paid call.
+    mockMvc
+        .perform(get("/api/v1/repositories/octocat/hello/explanation"))
+        .andExpect(status().is4xxClientError());
+    mockMvc
+        .perform(post("/api/v1/repositories/-bad/hello/explanation"))
+        .andExpect(status().isBadRequest());
+  }
+
+  /**
+   * Regression: browsers send an Origin header with POST, and the Vite dev proxy forwards it, so
+   * the explanation request is a CORS request. Allowing only GET made it fail with a bare 403.
+   */
+  @Test
+  void explanation_isAllowedFromTheFrontendOrigin_butNotFromOthers() throws Exception {
+    String url = "/api/v1/repositories/octocat/hello/explanation";
+    mockMvc.perform(post(url).header("Origin", "http://localhost:5173")).andExpect(status().isOk());
+    mockMvc
+        .perform(post(url).header("Origin", "https://evil.example"))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void explanationErrors_haveStableCodes() throws Exception {
+    String url = "/api/v1/repositories/octocat/hello/explanation";
+
+    doThrow(new ExplanationsDisabledException())
+        .when(explanationService)
+        .explain(any(), any(), any(), eq(false));
+    mockMvc
+        .perform(post(url))
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(jsonPath("$.code").value("AI_NOT_CONFIGURED"));
+
+    doThrow(new ExplanationLimitException(Instant.now().plusSeconds(600)))
+        .when(explanationService)
+        .explain(any(), any(), any(), eq(false));
+    mockMvc
+        .perform(post(url))
+        .andExpect(status().isTooManyRequests())
+        .andExpect(jsonPath("$.code").value("AI_LIMIT_REACHED"))
+        .andExpect(jsonPath("$.resetAt").exists())
+        .andExpect(header().exists("Retry-After"));
+
+    doThrow(new ExplanationUnavailableException("secret upstream detail", null))
+        .when(explanationService)
+        .explain(any(), any(), any(), eq(false));
+    mockMvc
+        .perform(post(url))
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(jsonPath("$.code").value("AI_UNAVAILABLE"))
+        .andExpect(
+            jsonPath("$.detail")
+                .value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("secret"))));
+
+    doThrow(new UnreliableExplanationException("declined"))
+        .when(explanationService)
+        .explain(any(), any(), any(), eq(false));
+    mockMvc
+        .perform(post(url))
+        .andExpect(status().isBadGateway())
+        .andExpect(jsonPath("$.code").value("AI_UNRELIABLE"));
   }
 
   @Test

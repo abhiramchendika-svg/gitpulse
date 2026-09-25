@@ -1,5 +1,7 @@
 import type {
   ActivityResponse,
+  ExplanationResponse,
+  FeaturesResponse,
   CommitAnalyticsResponse,
   ComparisonResponse,
   ContributorAnalyticsResponse,
@@ -11,7 +13,7 @@ import type {
   RepositoryOverview,
 } from '../types/api'
 import type { RepoRef } from '../utils/parseRepoInput'
-import { getJson } from './apiClient'
+import { getJson, postJson } from './apiClient'
 
 function base(ref: RepoRef): string {
   // Names are already validated by parseRepoInput; encoding is defence in depth.
@@ -74,6 +76,20 @@ export function fetchFileActivity(
   signal?: AbortSignal,
 ): Promise<FileActivityResponse> {
   return getJson(`${base(ref)}/files`, signal)
+}
+
+/** Which optional features the backend has enabled. */
+export function fetchFeatures(signal?: AbortSignal): Promise<FeaturesResponse> {
+  return getJson('/api/v1/features', signal)
+}
+
+/** Costs a paid AI call unless the backend has it cached. Only call when the user asks. */
+export function requestExplanation(
+  ref: RepoRef,
+  query: CommitQuery,
+  signal?: AbortSignal,
+): Promise<ExplanationResponse> {
+  return postJson(`${base(ref)}/explanation${windowQuery(query)}`, signal)
 }
 
 export function fetchProfile(login: string, signal?: AbortSignal): Promise<ProfileResponse> {

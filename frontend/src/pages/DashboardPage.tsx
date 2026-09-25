@@ -4,6 +4,7 @@ import { Card } from '../components/Card'
 import { CommitActivitySection } from '../components/CommitActivitySection'
 import { ContributorsSection } from '../components/ContributorsSection'
 import { DownloadButton } from '../components/DownloadButton'
+import { ExplanationSection } from '../components/ExplanationSection'
 import { ExportBar } from '../components/ExportBar'
 import { ErrorNotice } from '../components/ErrorNotice'
 import { FileActivitySection } from '../components/FileActivitySection'
@@ -19,6 +20,7 @@ import {
   fetchActivity,
   fetchCommits,
   fetchContributors,
+  fetchFeatures,
   fetchFileActivity,
   fetchIssues,
   fetchLanguages,
@@ -67,6 +69,10 @@ export function DashboardPage({ repo, range, excludeBots, onFiltersChange }: Das
   const files = useAsync(filesRequested ? gate : null, repoKey, (signal) =>
     fetchFileActivity(repo, signal),
   )
+
+  // Optional features the backend has enabled. If this fails, the features simply stay hidden.
+  const features = useAsync('features', 'features', (signal) => fetchFeatures(signal))
+  const explanationsEnabled = features.data?.explanations === true
 
   const linesPending = contributors.data?.statistics.lineStatsStatus === 'PENDING'
   const gaveUp = usePendingRetry(linesPending, contributors.loading, contributors.reload, repoKey)
@@ -135,6 +141,9 @@ export function DashboardPage({ repo, range, excludeBots, onFiltersChange }: Das
             <h2 id="activity-heading">Activity in the selected period</h2>
             <FilterBar range={range} excludeBots={excludeBots} onChange={onFiltersChange} />
           </div>
+          {explanationsEnabled && overview.data && (
+            <ExplanationSection repo={repo} repoKey={repoKey} query={{ since, excludeBots }} />
+          )}
           {render(commits, 'Commit activity', (data, stale) => (
             <CommitActivitySection data={data} stale={stale} />
           ))}

@@ -34,6 +34,8 @@ In scope, for example:
   profile fields, commit messages) or formula injection in exported CSV files;
 - input validation bypasses that reach GitHub with attacker-controlled paths;
 - stack traces or internal details in API errors;
+- the optional AI summary: exposure of the Anthropic key, GitHub-provided text reaching the
+  model (prompt injection), unverified numbers being shown, or ways around the hourly limit;
 - vulnerable dependencies that are actually reachable in GitPulse.
 
 Out of scope:
@@ -62,6 +64,10 @@ For reviewers, a summary of the design (details in
 - Errors are RFC 9457 problem details with a stable code; stack traces and exception messages are
   never included.
 - CORS allows only the configured origins. Actuator exposes only `/actuator/health`.
+- The optional Anthropic key is handled like the GitHub token (environment only, masked,
+  never returned). The AI summary receives only numbers, never GitHub-provided text; its
+  output is verified against those numbers and rendered as plain text; paid calls are `POST`,
+  cached, and capped per hour.
 - The frontend renders GitHub data as text (React escaping); links from profiles are shown only
   for `http(s)` URLs, and CSV exports neutralise spreadsheet formulas.
 - Dependabot keeps dependencies and GitHub Actions up to date.

@@ -12,11 +12,16 @@ type Route = (url: URL) => Response | undefined
  * header badge works. Returns the mock so tests can inspect which URLs were requested.
  */
 function mockBackend(route: Route) {
-  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+  // `init` is unused here, but typing it lets tests inspect the method of recorded calls.
+  const fetchMock = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
     const url = new URL(String(input), 'http://localhost')
     if (url.pathname === '/actuator/health') return Response.json({ status: 'UP' })
     if (url.pathname === '/api/v1/rate-limit') return Response.json(fx.rateLimit)
     const response = route(url)
+    // Optional features are off unless a test's route turns them on.
+    if (!response && url.pathname === '/api/v1/features') {
+      return Response.json({ explanations: false })
+    }
     if (!response) throw new Error(`Unexpected request: ${url.pathname}${url.search}`)
     return response
   })
@@ -585,6 +590,117 @@ describe('App', () => {
       'gitpulse-facebook-react-commits-per-week.csv',
       'gitpulse-vuejs-core-commits-per-week.csv',
     ])
+  })
+
+  describe('AI explanation', () => {
+    const explanation = {
+      repository: 'octocat/hello-world',
+      generatedAt: '2026-09-25T12:00:00Z',
+      model: 'claude-opus-5',
+      window: { since: '2025-09-26T00:00:00Z', until: '2026-09-25T12:00:00Z', botsExcluded: false },
+      sentences: [
+        {
+          text: 'In the last 365 days there were 42 commits.',
+          basedOn: [
+            { id: 'window.days', label: 'Length of the selected period, in days', value: 365 },
+            { id: 'commits.total', label: 'Commits in the selected period', value: 42 },
+          ],
+        },
+        {
+          text: 'The repository has 12,345 stars.',
+          basedOn: [{ id: 'repository.stars', label: 'Stars', value: 12345 }],
+        },
+      ],
+      sentencesRemoved: 1,
+    }
+
+    function withExplanations(explain: () => Response = () => Response.json(explanation)) {
+      return mockBackend((url) => {
+        if (url.pathname === '/api/v1/features') return Response.json({ explanations: true })
+        if (url.pathname === `${REPO_BASE}/explanation`) return explain()
+        return happyRoutes()(url)
+      })
+    }
+
+    const posts = (fetchMock: ReturnType<typeof mockBackend>) =>
+      fetchMock.mock.calls.filter(
+        ([input, init]) => String(input).includes('/explanation') && init?.method === 'POST',
+      )
+
+    it('is hidden when the backend has no AI key', async () => {
+      mockBackend(happyRoutes())
+      window.history.replaceState(null, '', '/?repo=octocat/hello-world')
+      render(<App />)
+
+      await screen.findByRole('heading', { name: 'Commits per week' })
+      expect(screen.queryByRole('region', { name: 'Plain-English summary' })).toBeNull()
+    })
+
+    it('runs only when asked, and shows verified sentences with their sources', async () => {
+      const fetchMock = withExplanations()
+      window.history.replaceState(null, '', '/?repo=octocat/hello-world&range=90d')
+      render(<App />)
+
+      const card = await screen.findByRole('region', { name: 'Plain-English summary' })
+      expect(within(card).getByText(/Only the numbers are sent/)).toBeInTheDocument()
+      expect(posts(fetchMock)).toHaveLength(0)
+
+      await userEvent.click(within(card).getByRole('button', { name: 'Explain these numbers' }))
+
+      expect(
+        await within(card).findByText('In the last 365 days there were 42 commits.'),
+      ).toBeInTheDocument()
+      expect(
+        within(card).getByText(
+          'Based on: Length of the selected period, in days · Commits in the selected period',
+        ),
+      ).toBeInTheDocument()
+      expect(within(card).getByText(/1 sentence was left out/)).toBeInTheDocument()
+      expect(within(card).getByText(/Not a metric/)).toBeInTheDocument()
+      expect(posts(fetchMock)).toHaveLength(1)
+      expect(String(posts(fetchMock)[0][0])).toMatch(/explanation\?since=\d{4}-\d{2}-\d{2}$/)
+    })
+
+    it('does not spend another call when the filters change', async () => {
+      const fetchMock = withExplanations()
+      window.history.replaceState(null, '', '/?repo=octocat/hello-world')
+      render(<App />)
+
+      const card = await screen.findByRole('region', { name: 'Plain-English summary' })
+      await userEvent.click(within(card).getByRole('button', { name: 'Explain these numbers' }))
+      await within(card).findByText('The repository has 12,345 stars.')
+
+      await userEvent.click(screen.getByRole('radio', { name: 'Last 30 days' }))
+
+      expect(
+        await within(card).findByRole('button', { name: 'Explain these numbers' }),
+      ).toBeVisible()
+      expect(within(card).queryByText('The repository has 12,345 stars.')).toBeNull()
+      expect(posts(fetchMock)).toHaveLength(1)
+    })
+
+    it('explains when the hourly AI limit is reached', async () => {
+      withExplanations(() =>
+        Response.json(
+          {
+            status: 429,
+            code: 'AI_LIMIT_REACHED',
+            detail: 'limit',
+            resetAt: '2026-09-25T13:00:00Z',
+          },
+          { status: 429 },
+        ),
+      )
+      window.history.replaceState(null, '', '/?repo=octocat/hello-world')
+      render(<App />)
+
+      const card = await screen.findByRole('region', { name: 'Plain-English summary' })
+      await userEvent.click(within(card).getByRole('button', { name: 'Explain these numbers' }))
+
+      expect(await within(card).findByRole('alert')).toHaveTextContent(
+        'hourly limit for AI explanations',
+      )
+    })
   })
 
   it('opens the dashboard straight from a shared link', async () => {

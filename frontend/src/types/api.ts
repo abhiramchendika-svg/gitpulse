@@ -332,6 +332,29 @@ export interface ComparisonResponse {
   repositories: ComparisonSummary[]
 }
 
+/** GET /api/v1/features */
+export interface FeaturesResponse {
+  explanations: boolean
+}
+
+/** A number the AI explanation is based on (GitPulse-calculated or GitHub-provided). */
+export interface ExplanationFact {
+  id: string
+  label: string
+  value: number | string | boolean
+}
+
+/** POST /api/v1/repositories/{owner}/{repo}/explanation */
+export interface ExplanationResponse {
+  repository: string
+  generatedAt: string
+  model: string
+  window: { since: string; until: string; botsExcluded: boolean }
+  sentences: { text: string; basedOn: ExplanationFact[] }[]
+  /** Sentences that failed verification and are not shown. */
+  sentencesRemoved: number
+}
+
 export interface ProfileRepositoryItem {
   fullName: string
   htmlUrl: string

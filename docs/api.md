@@ -16,6 +16,10 @@ Every error is an [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) problem det
 | 404  | `NOT_FOUND`            | Unknown route.                                                            |
 | 429  | `RATE_LIMITED`         | GitHub rate limit reached. Has `Retry-After` header and `resetAt` field.  |
 | 502  | `GITHUB_ERROR`         | GitHub answered unexpectedly.                                             |
+| 503  | `AI_NOT_CONFIGURED`    | Explanations are off: the server has no `ANTHROPIC_API_KEY`.              |
+| 429  | `AI_LIMIT_REACHED`     | Hourly explanation limit reached. Has `Retry-After` and `resetAt`.        |
+| 503  | `AI_UNAVAILABLE`       | The Anthropic API could not be reached or rejected the server's key.      |
+| 502  | `AI_UNRELIABLE`        | The AI answer failed verification (or was declined); nothing is shown.    |
 | 503  | `GITHUB_UNAVAILABLE`   | GitHub unreachable or returned 5xx.                                       |
 | 503  | `GITHUB_AUTH_FAILED`   | The server's `GITHUB_TOKEN` was rejected (server misconfiguration).       |
 | 500  | `INTERNAL_ERROR`       | Unexpected server error. No internal details are exposed.                 |
@@ -547,6 +551,66 @@ curl http://localhost:8080/api/v1/users/torvalds
 ```
 
 Errors: `400 INVALID_INPUT` (invalid name), `404 USER_NOT_FOUND`, `429`, `503`.
+
+## `GET /api/v1/features`
+
+Which optional features this server has enabled. The frontend hides what is off.
+
+```json
+{ "explanations": false }
+```
+
+## `POST /api/v1/repositories/{owner}/{repo}/explanation`
+
+**Optional, off by default.** A short plain-English summary of the dashboard's numbers, written
+by Claude (Anthropic) and **verified against those numbers** before it is returned. Enabled only
+when the server has `ANTHROPIC_API_KEY`. Query parameters: `since`, `until`, `excludeBots`, as for
+the windowed endpoints.
+
+It is `POST` because every uncached call costs money: link prefetchers and crawlers never send
+`POST`. Answers are cached for 10 minutes per repository and window, and the server allows at most
+`GITPULSE_AI_MAX_PER_HOUR` (default 20) model calls per hour in total. Cached answers don't
+count; failed calls do, because they can cost money too.
+
+What is sent to the model: only numbers GitPulse has already calculated (with ids and labels). No
+logins, names, commit messages, titles or descriptions. Counts that are lower bounds are left out.
+
+```json
+{
+  "repository": "spring-projects/spring-petclinic",
+  "generatedAt": "2026-09-25T12:00:00Z",
+  "model": "claude-opus-5",
+  "window": {
+    "since": "2025-09-26T00:00:00Z",
+    "until": "2026-09-25T12:00:00Z",
+    "botsExcluded": false
+  },
+  "sentences": [
+    {
+      "text": "In the last 365 days there were 240 commits.",
+      "basedOn": [
+        {
+          "id": "window.days",
+          "label": "Length of the selected period, in days",
+          "value": 365
+        },
+        {
+          "id": "commits.total",
+          "label": "Commits in the selected period",
+          "value": 240
+        }
+      ]
+    }
+  ],
+  "sentencesRemoved": 1
+}
+```
+
+`sentencesRemoved` counts sentences the model wrote that failed verification. How verification
+works: [metrics.md](metrics.md#ai-explanation-not-a-metric).
+
+Errors: `AI_NOT_CONFIGURED`, `AI_LIMIT_REACHED`, `AI_UNAVAILABLE`, `AI_UNRELIABLE`, plus the usual
+GitHub errors (these happen before any model call, so they cost nothing).
 
 ---
 
