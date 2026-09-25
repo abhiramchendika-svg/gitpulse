@@ -47,3 +47,8 @@
   margin: 0;
   color: var(--text-muted);
 }
+
+/* Sit close to the overview it belongs to rather than a full grid gap away. */
+.export {
+  margin-bottom: -1rem;
+}

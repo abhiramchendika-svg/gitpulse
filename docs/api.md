@@ -12,6 +12,7 @@ Every error is an [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) problem det
 | ---- | ---------------------- | ------------------------------------------------------------------------- |
 | 400  | `INVALID_INPUT`        | Bad owner/repo name, bad date format, or an invalid date range.           |
 | 404  | `REPOSITORY_NOT_FOUND` | Repository does not exist **or is private** (GitHub reports both as 404). |
+| 404  | `USER_NOT_FOUND`       | No GitHub user or organization with that name.                            |
 | 404  | `NOT_FOUND`            | Unknown route.                                                            |
 | 429  | `RATE_LIMITED`         | GitHub rate limit reached. Has `Retry-After` header and `resetAt` field.  |
 | 502  | `GITHUB_ERROR`         | GitHub answered unexpectedly.                                             |
@@ -546,3 +547,62 @@ curl http://localhost:8080/api/v1/users/torvalds
 ```
 
 Errors: `400 INVALID_INPUT` (invalid name), `404 USER_NOT_FOUND`, `429`, `503`.
+
+---
+
+## Exported files
+
+Export happens **in the browser**, from the responses above that the page already holds. It
+makes no extra requests and costs no GitHub quota, and the file always matches what was on
+screen. There is no export endpoint.
+
+### JSON report
+
+The "JSON report" button on the dashboard, a profile or a comparison saves:
+
+```json
+{
+  "generator": "GitPulse",
+  "schemaVersion": 1,
+  "kind": "repository",
+  "subject": "octocat/hello-world",
+  "exportedAt": "2026-09-25T10:00:00.000Z",
+  "notes": ["Public GitHub data only. …"],
+  "data": {
+    "filters": { "range": "90d", "since": "2026-06-27", "excludeBots": false },
+    "notIncluded": [{ "section": "fileActivity", "reason": "NOT_REQUESTED" }],
+    "overview": { "…": "GET /api/v1/repositories/{owner}/{repo}" },
+    "activity": { "…": "…/activity" },
+    "commits": { "…": "…/commits" },
+    "pullRequests": { "…": "…/pull-requests" },
+    "issues": { "…": "…/issues" },
+    "contributors": { "…": "…/contributors" },
+    "languages": { "…": "…/languages" },
+    "fileActivity": null
+  }
+}
+```
+
+- `kind` is `repository`, `profile` or `comparison`. For `profile` and `comparison`, `data` is
+  the unchanged response of `GET /api/v1/users/{username}` or `GET /api/v1/compare`.
+- For `repository`, each section is the unchanged response of its endpoint, **including its
+  `meta`** (analysis window, sample size, truncation), so an export is self-describing. A section
+  that failed or was never requested is `null` and listed in `notIncluded` with the error `code`
+  (e.g. `RATE_LIMITED`) or `NOT_REQUESTED`.
+- The button is disabled while any section is loading, so a report never mixes two time ranges.
+- `schemaVersion` increases only on breaking changes to this envelope. Fields inside `data`
+  follow this API reference.
+
+### CSV
+
+Every chart's table view, and the full contributor list, has a "Download CSV" button.
+
+- RFC 4180: comma-separated, CRLF line endings, fields quoted when they contain `,` `"` or a
+  line break. UTF-8 with a byte-order mark so Excel shows non-ASCII names correctly.
+- Numbers are exact (never `12.3K`). Missing values (e.g. line counts GitHub did not provide) are
+  empty cells, not `0`.
+- **CSV injection protection:** text cells that start with `=`, `+`, `-`, `@`, tab or carriage
+  return are prefixed with `'`, so a commit message or name such as `=HYPERLINK(…)` is shown as
+  text instead of running as a spreadsheet formula.
+- File names: `gitpulse-<subject>-<table>-<yyyymmdd>.csv`, e.g.
+  `gitpulse-octocat-hello-world-contributors-20260925.csv` (date in UTC).

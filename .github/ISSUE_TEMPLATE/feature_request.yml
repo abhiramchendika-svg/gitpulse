@@ -1,0 +1,41 @@
+name: Feature request
+description: Suggest a new feature or an improvement.
+labels: ["enhancement", "needs triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        GitPulse describes public GitHub activity. It deliberately does **not** score or rank
+        developers, so requests for productivity scores or leaderboards will be declined.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: Who needs it, and what are they trying to find out?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: >-
+        What should GitPulse show or do? For a new metric, include how it would be calculated.
+    validations:
+      required: true
+  - type: textarea
+    id: cost
+    attributes:
+      label: GitHub data and cost
+      description: >-
+        Which GitHub API endpoints would it need, and roughly how many requests? (Anonymous
+        users only get 60 requests per hour.) Leave empty if you're not sure.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Contributing
+      options:
+        - label: I'd like to work on this myself.

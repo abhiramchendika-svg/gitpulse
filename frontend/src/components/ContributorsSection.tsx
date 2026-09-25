@@ -1,11 +1,25 @@
 import { useState } from 'react'
 import type { ContributorAnalyticsResponse } from '../types/api'
+import { downloadCsv, exportFileName } from '../utils/export'
+import { useExportScope } from '../utils/exportScope'
 import { Card } from './Card'
 import styles from './ContributorsSection.module.css'
+import { DownloadButton } from './DownloadButton'
 import { InfoNotice } from './ErrorNotice'
 import { StatGrid, StatTile } from './StatTile'
 
 const INITIAL_ROWS = 15
+
+const CSV_COLUMNS = [
+  'Rank',
+  'Login',
+  'Bot',
+  'Commits',
+  'Share of listed commits (%)',
+  'Lines added',
+  'Lines deleted',
+  'Profile',
+]
 
 interface ContributorsSectionProps {
   data: ContributorAnalyticsResponse
@@ -18,6 +32,7 @@ interface ContributorsSectionProps {
 
 export function ContributorsSection({ data, retrying, gaveUp, onRetry }: ContributorsSectionProps) {
   const [showAll, setShowAll] = useState(false)
+  const scope = useExportScope()
   const s = data.statistics
 
   if (!data.available) {
@@ -135,11 +150,36 @@ export function ContributorsSection({ data, retrying, gaveUp, onRetry }: Contrib
           </tbody>
         </table>
       </div>
-      {s.contributors.length > INITIAL_ROWS && (
-        <button type="button" className={styles.more} onClick={() => setShowAll((v) => !v)}>
-          {showAll ? 'Show fewer' : `Show all ${s.contributors.length}`}
-        </button>
-      )}
+      <div className={styles.footer}>
+        {s.contributors.length > INITIAL_ROWS && (
+          <button type="button" onClick={() => setShowAll((v) => !v)}>
+            {showAll ? 'Show fewer' : `Show all ${s.contributors.length}`}
+          </button>
+        )}
+        {s.contributors.length > 0 && (
+          <DownloadButton
+            what="All listed contributors"
+            onClick={() =>
+              downloadCsv(
+                exportFileName([...scope, 'contributors'], 'csv'),
+                CSV_COLUMNS,
+                s.contributors.map((c, i) => [
+                  i + 1,
+                  c.login,
+                  c.bot,
+                  c.commits,
+                  c.sharePercent,
+                  c.additions,
+                  c.deletions,
+                  c.htmlUrl,
+                ]),
+              )
+            }
+          >
+            Download CSV
+          </DownloadButton>
+        )}
+      </div>
     </Card>
   )
 }

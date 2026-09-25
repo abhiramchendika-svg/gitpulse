@@ -1,8 +1,10 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { ActivitySection } from '../components/ActivitySection'
 import { Card } from '../components/Card'
 import { CommitActivitySection } from '../components/CommitActivitySection'
 import { ContributorsSection } from '../components/ContributorsSection'
+import { DownloadButton } from '../components/DownloadButton'
+import { ExportBar } from '../components/ExportBar'
 import { ErrorNotice } from '../components/ErrorNotice'
 import { FileActivitySection } from '../components/FileActivitySection'
 import { FilterBar } from '../components/FilterBar'
@@ -17,11 +19,14 @@ import {
   fetchActivity,
   fetchCommits,
   fetchContributors,
+  fetchFileActivity,
   fetchIssues,
   fetchLanguages,
   fetchOverview,
   fetchPullRequests,
 } from '../services/repositoryService'
+import { buildReport, downloadJson, exportFileName } from '../utils/export'
+import { ExportScope } from '../utils/exportScope'
 import { formatRepo, type RepoRef } from '../utils/parseRepoInput'
 import styles from './DashboardPage.module.css'
 
@@ -56,6 +61,13 @@ export function DashboardPage({ repo, range, excludeBots, onFiltersChange }: Das
   // Activity reuses the backend's cached default-window data, so it is effectively free.
   const activity = useAsync(gate, repoKey, (signal) => fetchActivity(repo, signal))
 
+  // File activity is expensive, so it only runs when asked. App keys this page by repository, so
+  // opening another repository starts with it not requested.
+  const [filesRequested, setFilesRequested] = useState(false)
+  const files = useAsync(filesRequested ? gate : null, repoKey, (signal) =>
+    fetchFileActivity(repo, signal),
+  )
+
   const linesPending = contributors.data?.statistics.lineStatsStatus === 'PENDING'
   const gaveUp = usePendingRetry(linesPending, contributors.loading, contributors.reload, repoKey)
 
@@ -67,63 +79,108 @@ export function DashboardPage({ repo, range, excludeBots, onFiltersChange }: Das
     )
   }
 
+  const sections = {
+    overview,
+    activity,
+    commits,
+    pullRequests,
+    issues,
+    contributors,
+    languages,
+    fileActivity: files,
+  }
+  const busy = Object.values(sections).some((s) => s.loading)
+
+  function exportReport() {
+    const data = Object.fromEntries(
+      Object.entries(sections).map(([name, s]) => [name, s.error ? null : s.data]),
+    )
+    const notIncluded = Object.entries(sections)
+      .filter(([, s]) => s.error || !s.data)
+      .map(([name, s]) => ({ section: name, reason: s.error ? s.error.code : 'NOT_REQUESTED' }))
+    const report = buildReport('repository', formatRepo(repo), {
+      filters: { range, since, excludeBots },
+      notIncluded,
+      ...data,
+    })
+    downloadJson(exportFileName([repo.owner, repo.repo, range], 'json'), report)
+  }
+
   return (
-    <div className={styles.page}>
-      {overview.data ? (
-        <OverviewSection repo={overview.data} />
-      ) : (
-        <Placeholder title="Repository overview" />
-      )}
+    <ExportScope value={[repo.owner, repo.repo]}>
+      <div className={styles.page}>
+        {overview.data && (
+          <ExportBar hint="Everything this page shows, as exact values" className={styles.export}>
+            <DownloadButton
+              what={`${formatRepo(repo)} report`}
+              onClick={exportReport}
+              disabled={busy}
+              disabledReason="Wait until every section has loaded"
+            >
+              JSON report
+            </DownloadButton>
+          </ExportBar>
+        )}
+        {overview.data ? (
+          <OverviewSection repo={overview.data} />
+        ) : (
+          <Placeholder title="Repository overview" />
+        )}
 
-      {overview.data &&
-        render(activity, 'Recent activity', (data) => <ActivitySection data={data} />)}
+        {overview.data &&
+          render(activity, 'Recent activity', (data) => <ActivitySection data={data} />)}
 
-      <section className={styles.group} aria-labelledby="activity-heading">
-        <div className={styles.groupHeader}>
-          <h2 id="activity-heading">Activity in the selected period</h2>
-          <FilterBar range={range} excludeBots={excludeBots} onChange={onFiltersChange} />
-        </div>
-        {render(commits, 'Commit activity', (data, stale) => (
-          <CommitActivitySection data={data} stale={stale} />
-        ))}
-        <div className={styles.workItems}>
-          {render(pullRequests, 'Pull requests', (data, stale) => (
-            <PullRequestsSection data={data} stale={stale} />
-          ))}
-          {render(issues, 'Issues', (data, stale) => (
-            <IssuesSection data={data} stale={stale} />
-          ))}
-        </div>
-      </section>
-
-      <section className={styles.group} aria-labelledby="alltime-heading">
-        <div className={styles.groupHeader}>
-          <h2 id="alltime-heading">All-time</h2>
-        </div>
-        <div className={styles.allTime}>
-          {render(contributors, 'Contributors', (data) => (
-            <ContributorsSection
-              data={data}
-              retrying={linesPending && !gaveUp}
-              gaveUp={gaveUp}
-              onRetry={contributors.reload}
-            />
-          ))}
-          {render(languages, 'Languages', (data) => (
-            <LanguagesSection data={data} />
-          ))}
-        </div>
-      </section>
-
-      {overview.data && (
-        <section className={styles.group} aria-labelledby="files-heading">
+        <section className={styles.group} aria-labelledby="activity-heading">
           <div className={styles.groupHeader}>
-            <h2 id="files-heading">Files</h2>
+            <h2 id="activity-heading">Activity in the selected period</h2>
+            <FilterBar range={range} excludeBots={excludeBots} onChange={onFiltersChange} />
           </div>
-          <FileActivitySection repo={repo} repoKey={repoKey} />
+          {render(commits, 'Commit activity', (data, stale) => (
+            <CommitActivitySection data={data} stale={stale} />
+          ))}
+          <div className={styles.workItems}>
+            {render(pullRequests, 'Pull requests', (data, stale) => (
+              <PullRequestsSection data={data} stale={stale} />
+            ))}
+            {render(issues, 'Issues', (data, stale) => (
+              <IssuesSection data={data} stale={stale} />
+            ))}
+          </div>
         </section>
-      )}
-    </div>
+
+        <section className={styles.group} aria-labelledby="alltime-heading">
+          <div className={styles.groupHeader}>
+            <h2 id="alltime-heading">All-time</h2>
+          </div>
+          <div className={styles.allTime}>
+            {render(contributors, 'Contributors', (data) => (
+              <ContributorsSection
+                data={data}
+                retrying={linesPending && !gaveUp}
+                gaveUp={gaveUp}
+                onRetry={contributors.reload}
+              />
+            ))}
+            {render(languages, 'Languages', (data) => (
+              <LanguagesSection data={data} />
+            ))}
+          </div>
+        </section>
+
+        {overview.data && (
+          <section className={styles.group} aria-labelledby="files-heading">
+            <div className={styles.groupHeader}>
+              <h2 id="files-heading">Files</h2>
+            </div>
+            <FileActivitySection
+              requested={filesRequested}
+              onRequest={() => setFilesRequested(true)}
+              files={files}
+            />
+          </section>
+        )}
+      </div>
+    </ExportScope>
   )
 }
 

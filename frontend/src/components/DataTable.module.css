@@ -38,3 +38,9 @@
   top: 0;
   background: var(--surface);
 }
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.5rem;
+}

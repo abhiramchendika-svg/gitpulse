@@ -1,29 +1,23 @@
-import { useState } from 'react'
-import { useAsync } from '../hooks/useAsync'
-import { fetchFileActivity } from '../services/repositoryService'
-import type { FileStat } from '../types/api'
+import type { AsyncState } from '../hooks/useAsync'
+import type { FileActivityResponse, FileStat } from '../types/api'
 import { formatDate, formatRelative } from '../utils/format'
-import type { RepoRef } from '../utils/parseRepoInput'
 import { BarList } from './BarList'
 import { Card } from './Card'
 import { ErrorNotice, InfoNotice } from './ErrorNotice'
 import styles from './FileActivitySection.module.css'
 
 interface FileActivitySectionProps {
-  repo: RepoRef
-  repoKey: string
+  /** Whether the user has asked for the analysis (the request is only made then). */
+  requested: boolean
+  onRequest: () => void
+  files: AsyncState<FileActivityResponse>
 }
 
 /**
  * Most-changed files. Unlike the rest of the dashboard this costs one GitHub request per
  * analysed commit, so it only runs when the user asks, and the cost is stated up front.
  */
-export function FileActivitySection({ repo, repoKey }: FileActivitySectionProps) {
-  const [requested, setRequested] = useState(false)
-  const files = useAsync(requested ? repoKey : null, repoKey, (signal) =>
-    fetchFileActivity(repo, signal),
-  )
-
+export function FileActivitySection({ requested, onRequest, files }: FileActivitySectionProps) {
   if (!requested) {
     return (
       <Card title="File activity" subtitle="Which files and directories change most often">
@@ -31,7 +25,7 @@ export function FileActivitySection({ repo, repoKey }: FileActivitySectionProps)
           This needs one GitHub request per commit analysed: the most recent 20 commits without a
           GitHub token, 100 with one. Results are cached for 24 hours.
         </p>
-        <button type="button" className={styles.start} onClick={() => setRequested(true)}>
+        <button type="button" className={styles.start} onClick={onRequest}>
           Analyse recent commits
         </button>
       </Card>

@@ -1,10 +1,14 @@
 import { useId, useState, type FormEvent } from 'react'
 import { Card } from '../components/Card'
 import { WeeklyCommitsChart } from '../components/charts/WeeklyCommitsChart'
+import { DownloadButton } from '../components/DownloadButton'
+import { ExportBar } from '../components/ExportBar'
 import { ErrorNotice, InfoNotice } from '../components/ErrorNotice'
 import { useAsync } from '../hooks/useAsync'
 import { fetchComparison } from '../services/repositoryService'
-import type { ComparisonSummary } from '../types/api'
+import type { ComparisonResponse, ComparisonSummary } from '../types/api'
+import { buildReport, downloadJson, exportFileName } from '../utils/export'
+import { ExportScope } from '../utils/exportScope'
 import { formatCount, formatDate, formatRelative } from '../utils/format'
 import { formatRepo, parseRepoInput, type RepoRef } from '../utils/parseRepoInput'
 import styles from './ComparePage.module.css'
@@ -132,14 +136,14 @@ export function ComparePage({ repos, onCompare }: ComparePageProps) {
         </p>
       )}
 
-      {comparison.data && (
-        <Results summaries={comparison.data.repositories} stale={comparison.loading} />
-      )}
+      {comparison.data && <Results comparison={comparison.data} stale={comparison.loading} />}
     </div>
   )
 }
 
-function Results({ summaries, stale }: { summaries: ComparisonSummary[]; stale: boolean }) {
+function Results({ comparison, stale }: { comparison: ComparisonResponse; stale: boolean }) {
+  const summaries = comparison.repositories
+  const names = summaries.map((s) => s.fullName)
   // One shared y-axis for both charts, otherwise their bars are not comparable.
   const yMax = Math.max(1, ...summaries.flatMap((s) => s.weekly.map((w) => w.commits)))
   const anyPartial = summaries.some(
@@ -147,6 +151,21 @@ function Results({ summaries, stale }: { summaries: ComparisonSummary[]; stale: 
   )
   return (
     <div className={`${styles.results} ${stale ? styles.stale : ''}`}>
+      <ExportBar hint="Exact values for everything below">
+        <DownloadButton
+          what={`Comparison of ${names.join(' and ')}`}
+          disabled={stale}
+          disabledReason="Wait until the comparison has loaded"
+          onClick={() =>
+            downloadJson(
+              exportFileName(['compare', ...names], 'json'),
+              buildReport('comparison', names.join(','), comparison),
+            )
+          }
+        >
+          JSON report
+        </DownloadButton>
+      </ExportBar>
       <Card title="Side by side" source="mixed">
         <div className={styles.scroll}>
           <table className={styles.table}>
@@ -201,14 +220,15 @@ function Results({ summaries, stale }: { summaries: ComparisonSummary[]; stale: 
 
       <div className={styles.charts}>
         {summaries.map((s) => (
-          <Card
-            key={s.fullName}
-            title={`Commits per week: ${s.fullName}`}
-            subtitle="Both charts use the same scale"
-            source="calculated"
-          >
-            <WeeklyCommitsChart weekly={s.weekly} yMax={yMax} height={180} />
-          </Card>
+          <ExportScope key={s.fullName} value={[s.fullName]}>
+            <Card
+              title={`Commits per week: ${s.fullName}`}
+              subtitle="Both charts use the same scale"
+              source="calculated"
+            >
+              <WeeklyCommitsChart weekly={s.weekly} yMax={yMax} height={180} />
+            </Card>
+          </ExportScope>
         ))}
       </div>
     </div>

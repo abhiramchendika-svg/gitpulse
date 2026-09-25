@@ -1,10 +1,13 @@
 import { BarList } from '../components/BarList'
 import { Card } from '../components/Card'
+import { DownloadButton } from '../components/DownloadButton'
 import { ErrorNotice, InfoNotice } from '../components/ErrorNotice'
+import { ExportBar } from '../components/ExportBar'
 import { StatGrid, StatTile } from '../components/StatTile'
 import { useAsync } from '../hooks/useAsync'
 import { fetchProfile } from '../services/repositoryService'
 import type { ProfileRepositoryItem, ProfileResponse } from '../types/api'
+import { buildReport, downloadJson, exportFileName } from '../utils/export'
 import { formatCount, formatDate, formatRelative } from '../utils/format'
 import type { RepoRef } from '../utils/parseRepoInput'
 import styles from './ProfilePage.module.css'
@@ -47,6 +50,19 @@ function Profile({
 
   return (
     <div className={styles.page}>
+      <ExportBar hint="Everything on this page, as exact values">
+        <DownloadButton
+          what={`Profile of ${p.login}`}
+          onClick={() =>
+            downloadJson(
+              exportFileName(['user', p.login], 'json'),
+              buildReport('profile', p.login, data),
+            )
+          }
+        >
+          JSON report
+        </DownloadButton>
+      </ExportBar>
       <Card title={isOrganization ? 'Organization' : 'Profile'} source="github">
         <div className={styles.header}>
           <img className={styles.avatar} src={p.avatarUrl} alt="" width={64} height={64} />

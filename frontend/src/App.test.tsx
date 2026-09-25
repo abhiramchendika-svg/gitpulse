@@ -1,7 +1,7 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { StrictMode } from 'react'
-import { beforeAll, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import * as fx from './test/fixtures'
 
@@ -61,6 +61,30 @@ function requested(fetchMock: ReturnType<typeof mockBackend>, pathPart: string) 
   return fetchMock.mock.calls.map(([input]) => String(input)).filter((u) => u.includes(pathPart))
 }
 
+/** Captures files the app saves instead of letting jsdom try to navigate to a blob URL. */
+function captureDownloads() {
+  const files: { name: string; blob: Blob }[] = []
+  let pending: Blob | null = null
+  vi.spyOn(URL, 'createObjectURL').mockImplementation((blob) => {
+    pending = blob as Blob
+    return 'blob:test'
+  })
+  vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+    this: HTMLAnchorElement,
+  ) {
+    if (pending) files.push({ name: this.download, blob: pending })
+  })
+  return {
+    files,
+    async json(index = -1) {
+      return JSON.parse(await files.at(index)!.blob.text())
+    },
+  }
+}
+
+const DATE = /-\d{8}\./
+
 async function analyse(text: string) {
   await userEvent.type(screen.getByRole('textbox', { name: 'GitHub repository or user' }), text)
   await userEvent.click(screen.getByRole('button', { name: 'Analyse' }))
@@ -75,6 +99,8 @@ describe('App', () => {
     await import('./pages/DashboardPage')
     await import('./pages/ComparePage')
   }, 30_000)
+
+  afterEach(() => vi.restoreAllMocks())
 
   it('shows the landing page with backend status before a repository is chosen', async () => {
     mockBackend(() => undefined)
@@ -322,6 +348,28 @@ describe('App', () => {
     ).toBeVisible()
   })
 
+  it('does not start file analysis for the next repository automatically', async () => {
+    // Any octocat/* repository answers like octocat/hello-world.
+    const fetchMock = mockBackend((url) =>
+      happyRoutes()(
+        new URL(
+          url.pathname.replace(/^(\/api\/v1\/repositories\/octocat\/)[^/]+/, '$1hello-world'),
+          url,
+        ),
+      ),
+    )
+    render(<App />)
+    await analyse('octocat/hello-world')
+    await userEvent.click(await screen.findByRole('button', { name: 'Analyse recent commits' }))
+    await screen.findByText(/The 20 most recent commits/)
+
+    const search = screen.getByRole('textbox', { name: 'GitHub repository or user' })
+    await userEvent.clear(search)
+    await analyse('octocat/spoon-knife')
+    expect(await screen.findByRole('button', { name: 'Analyse recent commits' })).toBeVisible()
+    expect(requested(fetchMock, '/files')).toEqual([`${REPO_BASE}/files`])
+  })
+
   it('compares two repositories side by side on a shared scale', async () => {
     const fetchMock = mockBackend((url) =>
       url.pathname === '/api/v1/compare'
@@ -419,6 +467,124 @@ describe('App', () => {
     await analyse('ghost123')
 
     expect(await screen.findByRole('alert')).toHaveTextContent('No GitHub user')
+  })
+
+  it('exports the dashboard as a JSON report, noting sections that are missing', async () => {
+    mockBackend(
+      happyRoutes({
+        issues: () =>
+          Response.json(
+            { status: 429, code: 'RATE_LIMITED', detail: 'GitHub API rate limit reached.' },
+            { status: 429 },
+          ),
+      }),
+    )
+    const downloads = captureDownloads()
+    window.history.replaceState(null, '', '/?repo=octocat/hello-world&range=90d&bots=exclude')
+    render(<App />)
+
+    await screen.findByRole('table', { name: 'Contributors by commits' })
+    await screen.findByRole('heading', { name: 'Commits per week' })
+    const button = screen.getByRole('button', { name: /JSON report: octocat\/hello-world report/ })
+    await waitFor(() => expect(button).toBeEnabled())
+    await userEvent.click(button)
+
+    expect(downloads.files[0].name).toMatch(/^gitpulse-octocat-hello-world-90d-\d{8}\.json$/)
+    const report = await downloads.json()
+    expect(report).toMatchObject({
+      generator: 'GitPulse',
+      kind: 'repository',
+      subject: 'octocat/hello-world',
+      data: {
+        filters: { range: '90d', excludeBots: true },
+        overview: { fullName: 'octocat/hello-world' },
+        commits: { repository: 'octocat/hello-world' },
+        issues: null,
+        fileActivity: null,
+      },
+    })
+    expect(report.data.notIncluded).toEqual([
+      { section: 'issues', reason: 'RATE_LIMITED' },
+      { section: 'fileActivity', reason: 'NOT_REQUESTED' },
+    ])
+
+    // Once file activity has been analysed, it is part of the report too.
+    await userEvent.click(screen.getByRole('button', { name: 'Analyse recent commits' }))
+    await screen.findByText(/The 20 most recent commits/)
+    await waitFor(() => expect(button).toBeEnabled())
+    await userEvent.click(button)
+    const second = await downloads.json()
+    expect(second.data.fileActivity.statistics.commitsAnalyzed).toBe(20)
+  })
+
+  it('downloads chart tables and the full contributor list as CSV', async () => {
+    mockBackend(happyRoutes())
+    const downloads = captureDownloads()
+    window.history.replaceState(null, '', '/?repo=octocat/hello-world')
+    render(<App />)
+
+    await screen.findByRole('table', { name: 'Contributors by commits' })
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Download CSV: All listed contributors' }),
+    )
+    const contributorsFile = downloads.files[0]
+    expect(contributorsFile.name).toMatch(/^gitpulse-octocat-hello-world-contributors/)
+    expect(contributorsFile.name).toMatch(DATE)
+    const csv = await contributorsFile.blob.text()
+    expect(csv.split('\r\n')[0]).toBe(
+      'Rank,Login,Bot,Commits,Share of listed commits (%),Lines added,Lines deleted,Profile',
+    )
+    expect(csv).toContain('1,mona,false,7,70,1200,300,https://github.com/mona')
+
+    await screen.findByRole('heading', { name: 'Commits per week' })
+    await userEvent.click(screen.getByRole('button', { name: 'Download CSV: Commits per week' }))
+    expect(downloads.files[1].name).toMatch(/^gitpulse-octocat-hello-world-commits-per-week-/)
+    expect((await downloads.files[1].blob.text()).split('\r\n')[0]).toBe(
+      'Week starting (UTC),Commits',
+    )
+  })
+
+  it('exports a profile and a comparison as JSON', async () => {
+    mockBackend((url) => {
+      if (url.pathname === '/api/v1/users/mona') return Response.json(fx.profile())
+      if (url.pathname === '/api/v1/compare')
+        return Response.json({
+          generatedAt: '2026-09-25T12:00:00Z',
+          repositories: [
+            fx.comparisonSummary('facebook/react', [2, 12]),
+            fx.comparisonSummary('vuejs/core', [1, 3]),
+          ],
+        })
+    })
+    const downloads = captureDownloads()
+
+    window.history.replaceState(null, '', '/?user=mona')
+    const { unmount } = render(<App />)
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'JSON report: Profile of mona' }),
+    )
+    expect(downloads.files[0].name).toMatch(/^gitpulse-user-mona-\d{8}\.json$/)
+    expect(await downloads.json()).toMatchObject({ kind: 'profile', subject: 'mona' })
+    unmount()
+
+    window.history.replaceState(null, '', '/?compare=facebook/react,vuejs/core')
+    render(<App />)
+    await userEvent.click(
+      await screen.findByRole('button', {
+        name: 'JSON report: Comparison of facebook/react and vuejs/core',
+      }),
+    )
+    expect(downloads.files[1].name).toMatch(/^gitpulse-compare-facebook-react-vuejs-core-/)
+    const report = await downloads.json()
+    expect(report.data.repositories).toHaveLength(2)
+    // Each repository's chart table gets its own file name.
+    const chartButtons = screen.getAllByRole('button', { name: 'Download CSV: Commits per week' })
+    await userEvent.click(chartButtons[0])
+    await userEvent.click(chartButtons[1])
+    expect(downloads.files.slice(2).map((f) => f.name.replace(DATE, '.'))).toEqual([
+      'gitpulse-facebook-react-commits-per-week.csv',
+      'gitpulse-vuejs-core-commits-per-week.csv',
+    ])
   })
 
   it('opens the dashboard straight from a shared link', async () => {

@@ -1,0 +1,59 @@
+name: Bug report
+description: Something does not work as documented.
+labels: ["bug", "needs triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! **Security problems:** please don't use this form; see SECURITY.md.
+        If a number looks wrong but nothing is broken, the "A number looks wrong" form fits better.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: input
+    id: link
+    attributes:
+      label: GitPulse link or request
+      description: >-
+        The page address (e.g. `?repo=owner/name&range=90d`) or the API request. Only public
+        repositories and users, please.
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open ...
+        2. Click ...
+        3. See ...
+    validations:
+      required: true
+  - type: textarea
+    id: error
+    attributes:
+      label: Error message or problem details
+      description: >-
+        The message shown, or the JSON error body (it has a `code` field). Never paste your
+        GitHub token.
+      render: json
+  - type: input
+    id: version
+    attributes:
+      label: Commit
+      description: The GitPulse commit you are running (`git rev-parse --short HEAD`).
+  - type: dropdown
+    id: token
+    attributes:
+      label: Is the backend using a GitHub token?
+      options:
+        - "Yes"
+        - "No (anonymous, 60 requests/hour)"
+        - I don't know
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Operating system, browser, Java and Node.js versions.

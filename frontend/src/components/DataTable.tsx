@@ -1,5 +1,8 @@
 import type { ReactNode } from 'react'
+import { downloadCsv, exportFileName } from '../utils/export'
+import { useExportScope } from '../utils/exportScope'
 import styles from './DataTable.module.css'
+import { DownloadButton } from './DownloadButton'
 
 interface DataTableProps {
   caption: string
@@ -9,12 +12,21 @@ interface DataTableProps {
 
 /**
  * The table view of a chart: the same numbers without needing to read colours or bar lengths.
- * Collapsed by default so it doesn't crowd the dashboard.
+ * Collapsed by default so it doesn't crowd the dashboard, and downloadable as CSV.
  */
 export function ChartTable({ caption, columns, rows }: DataTableProps): ReactNode {
+  const scope = useExportScope()
   return (
     <details className={styles.details}>
       <summary>Show data as table</summary>
+      <div className={styles.actions}>
+        <DownloadButton
+          what={caption}
+          onClick={() => downloadCsv(exportFileName([...scope, caption], 'csv'), columns, rows)}
+        >
+          Download CSV
+        </DownloadButton>
+      </div>
       <div className={styles.scroll}>
         <table className={styles.table}>
           <caption className="visually-hidden">{caption}</caption>

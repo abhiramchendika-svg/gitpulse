@@ -1,0 +1,38 @@
+name: A number looks wrong
+description: A metric seems incorrect, surprising or unclear.
+labels: ["metric", "needs triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Every number GitPulse shows is either copied from GitHub or calculated with a formula in
+        `docs/metrics.md`. Questions about either are welcome, and so are suggestions for
+        explaining a metric better.
+  - type: input
+    id: link
+    attributes:
+      label: GitPulse link
+      description: The page address, including the time range, e.g. `?repo=owner/name&range=90d`.
+    validations:
+      required: true
+  - type: input
+    id: metric
+    attributes:
+      label: Which number?
+      placeholder: e.g. "Median time to merge" in the Pull requests card
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect, and why?
+      description: >-
+        For example, the value GitHub's website shows, or your own count. Links help.
+    validations:
+      required: true
+  - type: checkboxes
+    id: checked
+    attributes:
+      label: Checked
+      options:
+        - label: I read the definition of this metric in docs/metrics.md.

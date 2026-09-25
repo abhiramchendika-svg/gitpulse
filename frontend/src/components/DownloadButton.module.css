@@ -1,0 +1,16 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.button:hover:not(:disabled) {
+  color: var(--accent);
+}
+
+.icon {
+  flex: none;
+}

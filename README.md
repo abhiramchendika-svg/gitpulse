@@ -3,9 +3,9 @@
 **GitHub repository & commit analyzer.** GitPulse turns public GitHub activity (commits,
 contributors, languages, pull requests, issues) into factual, descriptive analytics.
 
-> **Status: early development (Phase 5 complete).** Analyse a repository (overview, activity,
+> **Status: early development (Phase 6 complete).** Analyse a repository (overview, activity,
 > commits, pull requests, issues, contributors, languages, file activity), compare two repositories,
-> or look at a GitHub user's public profile. Export and open-source documentation come next; see
+> or look at a GitHub user's public profile, and export any of it as JSON or CSV. See
 > [Roadmap](#roadmap).
 
 <!-- Screenshots: add docs/screenshots/dashboard.png once the repository is published. -->
@@ -29,6 +29,9 @@ contributors, languages, pull requests, issues) into factual, descriptive analyt
 - **Profiles:** enter a username for public facts: repositories, stars received (own repos
   only), languages by repository, recent public activity. No score; nothing private.
 - **Compare** two repositories: the same facts side by side, charts on a shared scale, no winner.
+- **Export:** a JSON report of any dashboard, profile or comparison, and CSV for every chart
+  table and the contributor list. Runs in the browser, so it costs no GitHub requests; CSV
+  files are protected against formula injection. Format: [docs/api.md](docs/api.md#exported-files).
 - Every view is a shareable link (`?repo=owner/name&range=90d`), and every chart has a table
   view. Paste `owner/repo`, a username or any GitHub URL.
 
@@ -49,6 +52,8 @@ React + TypeScript (Vite)  ──HTTP/JSON──▶  Spring Boot backend  ──
   `analysis/` are plain Java with no Spring or HTTP dependencies, so every formula is unit-tested.
 - `frontend/`: React 19 + TypeScript + Vite, Recharts for charts. Talks only to the backend;
   dashboard state lives in the URL. The dashboard (and its chart library) is lazy-loaded.
+
+Design decisions, caching, rate-limit strategy and security: [docs/architecture.md](docs/architecture.md).
 
 ## Prerequisites
 
@@ -138,7 +143,7 @@ Formatting: `./mvnw spotless:apply` (Java, google-java-format) and `npm run form
 4. ✅ Pull request and issue analytics, recent activity, rate-limit handling
 5. ✅ (5a) File activity, repository comparison, per-cache lifetimes, bounded parallel fetching
    · ✅ (5b) GitHub profile analysis
-6. Export (CSV/JSON) and full open-source documentation
+6. ✅ Export (CSV/JSON) and open-source documentation
 7. Optional AI features (evaluated, not assumed)
 
 ## Known limitations
@@ -155,6 +160,26 @@ Formatting: `./mvnw spotless:apply` (Java, google-java-format) and `npm run form
   its separate rate limit is reached.
 - File activity samples recent commits (20 without a token) rather than the whole history, since
   each commit costs one GitHub request.
+
+## Documentation
+
+| Document                                                       | Contents                                                 |
+| -------------------------------------------------------------- | -------------------------------------------------------- |
+| [docs/api.md](docs/api.md)                                     | REST API reference, errors, request costs, export format |
+| [docs/metrics.md](docs/metrics.md)                             | Definition and formula of every number                   |
+| [docs/architecture.md](docs/architecture.md)                   | How it's built and why                                   |
+| [docs/interview-preparation.md](docs/interview-preparation.md) | Talking about the project in interviews                  |
+
+## Contributing
+
+Contributions are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md) for setup, the ground rules
+(descriptive metrics only, every number documented) and the pull request process. Everyone
+taking part is expected to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+## Security
+
+Please report vulnerabilities privately, as described in [SECURITY.md](SECURITY.md), not in a
+public issue.
 
 ## License
 
