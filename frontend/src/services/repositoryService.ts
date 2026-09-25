@@ -6,6 +6,7 @@ import type {
   FileActivityResponse,
   IssueAnalyticsResponse,
   LanguageResponse,
+  ProfileResponse,
   PullRequestAnalyticsResponse,
   RepositoryOverview,
 } from '../types/api'
@@ -73,6 +74,10 @@ export function fetchFileActivity(
   signal?: AbortSignal,
 ): Promise<FileActivityResponse> {
   return getJson(`${base(ref)}/files`, signal)
+}
+
+export function fetchProfile(login: string, signal?: AbortSignal): Promise<ProfileResponse> {
+  return getJson(`/api/v1/users/${encodeURIComponent(login)}`, signal)
 }
 
 export function fetchComparison(

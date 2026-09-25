@@ -331,3 +331,60 @@ export interface ComparisonResponse {
   generatedAt: string
   repositories: ComparisonSummary[]
 }
+
+export interface ProfileRepositoryItem {
+  fullName: string
+  htmlUrl: string
+  description: string | null
+  language: string | null
+  stars: number
+  forks: number
+  fork: boolean
+  archived: boolean
+  pushedAt: string | null
+}
+
+/** GET /api/v1/users/{username} */
+export interface ProfileResponse {
+  profile: {
+    login: string
+    type: 'User' | 'Organization' | string
+    name: string | null
+    avatarUrl: string
+    htmlUrl: string
+    bio: string | null
+    company: string | null
+    blog: string | null
+    location: string | null
+    publicRepos: number
+    followers: number
+    following: number
+    createdAt: string
+  }
+  meta: { generatedAt: string; repositoriesTruncated: boolean; eventsAnalyzed: boolean }
+  statistics: {
+    repositoriesAnalyzed: number
+    originalRepositories: number
+    forkedRepositories: number
+    archivedRepositories: number
+    starsReceived: number
+    forksReceived: number
+    languages: { name: string; repositories: number; percent: number }[]
+    repositoriesWithoutLanguage: number
+    pushedLast30Days: number
+    pushedLast90Days: number
+    pushedLastYear: number
+    mostStarred: ProfileRepositoryItem[]
+    recentlyPushed: ProfileRepositoryItem[]
+    createdPerYear: { year: number; repositories: number }[]
+    events: {
+      count: number
+      from: string | null
+      to: string | null
+      activeDays: number
+      repositoriesTouched: number
+      byType: { type: string; label: string; count: number }[]
+      topRepositories: { repository: string; events: number }[]
+    } | null
+  }
+}

@@ -210,3 +210,25 @@ time since the repository was created on GitHub, in years of 365.2425 days.
 
 There is **no score and no winner**. The dashboard charts both repositories' weekly commits on a
 **shared y-axis**; with separate scales a quiet repository would look as busy as an active one.
+
+## Profile: `GET /api/v1/users/{username}`
+
+Public information only. Private repositories and private contributions are not visible through
+GitHub's API and are **not estimated**. The profile's email address is never read. There is no
+ranking, score or "impact" number.
+
+| Field                                         | Source              | Definition                                                                                                    |
+| --------------------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `profile.*`                                   | GitHub-provided     | Public profile fields (`GET /users/{u}`).                                                                     |
+| `repositoriesAnalyzed`                        | GitHub-provided     | Public repositories the account owns, most recently pushed first, at most 300 (`meta.repositoriesTruncated`). |
+| `starsReceived`, `forksReceived`              | GitPulse-calculated | Sums over the account's **own** repositories. Forks are excluded: a fork's stars belong to the fork.          |
+| `languages[].repositories`                    | GitPulse-calculated | Own repositories per GitHub-detected **primary** language. Counts repositories, not code or skill.            |
+| `pushedLast30Days` / `90Days` / `LastYear`    | GitPulse-calculated | Repositories (own or forks) whose `pushed_at` falls in the period.                                            |
+| `mostStarred`                                 | GitHub-provided     | Own repositories by stars.                                                                                    |
+| `recentlyPushed`                              | GitHub-provided     | All repositories by `pushed_at`.                                                                              |
+| `createdPerYear`                              | GitPulse-calculated | Repositories created per UTC year, zero-filled up to the current year.                                        |
+| `events.count`, `.byType`, `.topRepositories` | GitPulse-calculated | From `GET /users/{u}/events/public`, which keeps **only the last 90 days and at most 300 events**.            |
+| `events.activeDays`                           | GitPulse-calculated | Distinct UTC days with at least one public event.                                                             |
+
+`events` is `null` for **organizations**: their public event feed mixes many members' activity and
+would not describe the account itself.

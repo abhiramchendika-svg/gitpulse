@@ -7,6 +7,7 @@ import type {
   FileStat,
   IssueAnalyticsResponse,
   LanguageResponse,
+  ProfileResponse,
   PullRequestAnalyticsResponse,
   RateLimitResponse,
   RepositoryOverview,
@@ -339,5 +340,69 @@ export function comparisonSummary(fullName: string, weeklyCommits: number[]): Co
       commits,
     })),
     activity: activity().indicators,
+  }
+}
+
+export function profile(type: 'User' | 'Organization' = 'User'): ProfileResponse {
+  const repo = (name: string, stars: number, fork = false) => ({
+    fullName: `mona/${name}`,
+    htmlUrl: `https://github.com/mona/${name}`,
+    description: null,
+    language: 'Java',
+    stars,
+    forks: 1,
+    fork,
+    archived: false,
+    pushedAt: '2026-09-20T00:00:00Z',
+  })
+  return {
+    profile: {
+      login: 'mona',
+      type,
+      name: 'Mona Lisa',
+      avatarUrl: 'https://example.test/m.png',
+      htmlUrl: 'https://github.com/mona',
+      bio: 'Builds things',
+      company: null,
+      blog: 'javascript:alert(1)',
+      location: 'Earth',
+      publicRepos: 3,
+      followers: 1200,
+      following: 5,
+      createdAt: '2015-01-01T00:00:00Z',
+    },
+    meta: {
+      generatedAt: '2026-09-25T12:00:00Z',
+      repositoriesTruncated: false,
+      eventsAnalyzed: type === 'User',
+    },
+    statistics: {
+      repositoriesAnalyzed: 3,
+      originalRepositories: 2,
+      forkedRepositories: 1,
+      archivedRepositories: 0,
+      starsReceived: 51,
+      forksReceived: 2,
+      languages: [{ name: 'Java', repositories: 2, percent: 100 }],
+      repositoriesWithoutLanguage: 0,
+      pushedLast30Days: 2,
+      pushedLast90Days: 3,
+      pushedLastYear: 3,
+      mostStarred: [repo('app', 50), repo('lib', 1)],
+      recentlyPushed: [repo('app', 50)],
+      createdPerYear: [{ year: 2025, repositories: 3 }],
+      events:
+        type === 'User'
+          ? {
+              count: 4,
+              from: '2026-09-01T00:00:00Z',
+              to: '2026-09-20T00:00:00Z',
+              activeDays: 3,
+              repositoriesTouched: 2,
+              byType: [{ type: 'PushEvent', label: 'Pushes', count: 3 }],
+              topRepositories: [{ repository: 'mona/app', events: 3 }],
+            }
+          : null,
+    },
   }
 }

@@ -6,6 +6,7 @@ import io.github.abhiramchendika.gitpulse.analysis.ContributorAnalyzer;
 import io.github.abhiramchendika.gitpulse.analysis.FileActivityAnalyzer;
 import io.github.abhiramchendika.gitpulse.analysis.IssueAnalyzer;
 import io.github.abhiramchendika.gitpulse.analysis.LanguageAnalyzer;
+import io.github.abhiramchendika.gitpulse.analysis.ProfileAnalyzer;
 import io.github.abhiramchendika.gitpulse.analysis.PullRequestAnalyzer;
 import java.time.Clock;
 import org.springframework.cache.annotation.EnableCaching;
@@ -64,4 +65,12 @@ public class AnalysisConfig {
   FileActivityAnalyzer fileActivityAnalyzer(FileActivityProperties properties) {
     return new FileActivityAnalyzer(properties.listLimit());
   }
+
+  @Bean
+  ProfileAnalyzer profileAnalyzer() {
+    return new ProfileAnalyzer(PROFILE_LIST_LIMIT);
+  }
+
+  /** Entries per ranked list on a profile (languages, repositories, event types). */
+  static final int PROFILE_LIST_LIMIT = 8;
 }

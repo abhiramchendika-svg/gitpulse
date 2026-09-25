@@ -11,11 +11,14 @@ import io.github.abhiramchendika.gitpulse.github.model.GitHubCommit;
 import io.github.abhiramchendika.gitpulse.github.model.GitHubCommitDetail;
 import io.github.abhiramchendika.gitpulse.github.model.GitHubContributor;
 import io.github.abhiramchendika.gitpulse.github.model.GitHubContributorStats;
+import io.github.abhiramchendika.gitpulse.github.model.GitHubEvent;
 import io.github.abhiramchendika.gitpulse.github.model.GitHubIssue;
 import io.github.abhiramchendika.gitpulse.github.model.GitHubPullRequest;
 import io.github.abhiramchendika.gitpulse.github.model.GitHubRateLimitResponse;
 import io.github.abhiramchendika.gitpulse.github.model.GitHubRepository;
+import io.github.abhiramchendika.gitpulse.github.model.GitHubRepositorySummary;
 import io.github.abhiramchendika.gitpulse.github.model.GitHubSearchResult;
+import io.github.abhiramchendika.gitpulse.github.model.GitHubUserProfile;
 import java.io.IOException;
 import java.net.URI;
 import java.time.Duration;
@@ -75,6 +78,10 @@ public class GitHubClient {
   private static final ParameterizedTypeReference<List<GitHubIssue>> ISSUES =
       new ParameterizedTypeReference<>() {};
   private static final ParameterizedTypeReference<List<Object>> ANY_LIST =
+      new ParameterizedTypeReference<>() {};
+  private static final ParameterizedTypeReference<List<GitHubRepositorySummary>> USER_REPOSITORIES =
+      new ParameterizedTypeReference<>() {};
+  private static final ParameterizedTypeReference<List<GitHubEvent>> EVENTS =
       new ParameterizedTypeReference<>() {};
 
   private final RestClient restClient;
@@ -171,6 +178,47 @@ public class GitHubClient {
    */
   public long countCommits(String owner, String repo) {
     return countItems(uri -> uri.path("/repos/{owner}/{repo}/commits").build(owner, repo));
+  }
+
+  /** {@code GET /users/{username}}: a user's or organization's public profile. 1 request. */
+  public GitHubUserProfile getUser(String username) {
+    return requireBody(
+        execute(
+            () ->
+                restClient
+                    .get()
+                    .uri("/users/{username}", username)
+                    .retrieve()
+                    .body(GitHubUserProfile.class)));
+  }
+
+  /**
+   * {@code GET /users/{username}/repos}: public repositories the account owns, most recently pushed
+   * first. One request per 100 repositories, capped at {@code maxPages}.
+   */
+  public PagedResult<GitHubRepositorySummary> listUserRepositories(String username, int maxPages) {
+    return fetchPages(
+        uri ->
+            uri.path("/users/{username}/repos")
+                .queryParam("sort", "pushed")
+                .queryParam("per_page", PER_PAGE)
+                .build(username),
+        USER_REPOSITORIES,
+        maxPages);
+  }
+
+  /**
+   * {@code GET /users/{username}/events/public}: the account's recent public activity. GitHub keeps
+   * only the last 90 days and at most 300 events, so at most 3 pages exist.
+   */
+  public PagedResult<GitHubEvent> listPublicEvents(String username, int maxPages) {
+    return fetchPages(
+        uri ->
+            uri.path("/users/{username}/events/public")
+                .queryParam("per_page", PER_PAGE)
+                .build(username),
+        EVENTS,
+        maxPages);
   }
 
   /**

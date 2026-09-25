@@ -7,6 +7,7 @@ import io.github.abhiramchendika.gitpulse.github.exception.GitHubRateLimitExcept
 import io.github.abhiramchendika.gitpulse.github.exception.GitHubUnavailableException;
 import io.github.abhiramchendika.gitpulse.service.InvalidRequestException;
 import io.github.abhiramchendika.gitpulse.service.RepositoryNotFoundException;
+import io.github.abhiramchendika.gitpulse.service.UserNotFoundException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.stream.Collectors;
@@ -46,6 +47,15 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             + e.getFullName()
             + "' was not found. It may not exist, or it may be private (GitHub reports both the"
             + " same way).");
+  }
+
+  @ExceptionHandler(UserNotFoundException.class)
+  ResponseEntity<ProblemDetail> handleUserNotFound(UserNotFoundException e) {
+    // The name was validated against a strict allow-list, so echoing it back is safe.
+    return problem(
+        HttpStatus.NOT_FOUND,
+        ErrorCode.USER_NOT_FOUND,
+        "No GitHub user or organization named '" + e.getUsername() + "' was found.");
   }
 
   @ExceptionHandler(InvalidRequestException.class)

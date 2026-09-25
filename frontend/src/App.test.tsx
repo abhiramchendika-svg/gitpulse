@@ -62,17 +62,19 @@ function requested(fetchMock: ReturnType<typeof mockBackend>, pathPart: string) 
 }
 
 async function analyse(text: string) {
-  await userEvent.type(screen.getByRole('textbox', { name: 'GitHub repository' }), text)
+  await userEvent.type(screen.getByRole('textbox', { name: 'GitHub repository or user' }), text)
   await userEvent.click(screen.getByRole('button', { name: 'Analyse' }))
 }
 
 describe('App', () => {
   // The dashboard is lazy-loaded. Import it once up front so the first test that opens it is not
   // measuring module transformation time against Testing Library's 1s wait.
+  // On a cold cache (first run, slow CI machine) transforming these modules can exceed the
+  // default 10 s hook timeout, which made this hook fail once in local testing.
   beforeAll(async () => {
     await import('./pages/DashboardPage')
     await import('./pages/ComparePage')
-  })
+  }, 30_000)
 
   it('shows the landing page with backend status before a repository is chosen', async () => {
     mockBackend(() => undefined)
@@ -338,9 +340,9 @@ describe('App', () => {
     // The compare page is lazy-loaded: wait for its two inputs to appear.
     await screen.findByRole('heading', { name: 'Compare two repositories' })
     const inputs = screen.getAllByPlaceholderText('owner/repo or GitHub URL')
-    // [0] is the header search box.
-    await userEvent.type(inputs[1], 'facebook/react')
-    await userEvent.type(inputs[2], 'https://github.com/vuejs/core')
+    // The header search box has a different placeholder, so these are the two compare inputs.
+    await userEvent.type(inputs[0], 'facebook/react')
+    await userEvent.type(inputs[1], 'https://github.com/vuejs/core')
     await userEvent.click(screen.getByRole('button', { name: 'Compare' }))
 
     const table = await screen.findByRole('table', { name: 'Comparison of two repositories' })
@@ -362,12 +364,61 @@ describe('App', () => {
     render(<App />)
 
     const inputs = await screen.findAllByPlaceholderText('owner/repo or GitHub URL')
-    await userEvent.type(inputs[1], 'facebook/react')
-    await userEvent.type(inputs[2], 'Facebook/React')
+    await userEvent.type(inputs[0], 'facebook/react')
+    await userEvent.type(inputs[1], 'Facebook/React')
     await userEvent.click(screen.getByRole('button', { name: 'Compare' }))
 
     expect(screen.getByRole('alert')).toHaveTextContent('Choose two different repositories.')
     expect(requested(fetchMock, '/compare')).toHaveLength(0)
+  })
+
+  it('opens a user profile from the search box', async () => {
+    const fetchMock = mockBackend((url) =>
+      url.pathname === '/api/v1/users/mona' ? Response.json(fx.profile()) : happyRoutes()(url),
+    )
+    render(<App />)
+
+    await analyse('https://github.com/mona')
+
+    expect(await screen.findByRole('link', { name: 'Mona Lisa' })).toBeInTheDocument()
+    expect(window.location.search).toBe('?user=mona')
+    expect(screen.getByText('51')).toBeInTheDocument() // stars received
+    expect(screen.getByText(/Private\s+contributions are never visible here/)).toBeInTheDocument()
+    // A javascript: "blog" URL from the profile must not become a clickable script link.
+    const blog = screen.getByRole('link', { name: 'javascript:alert(1)' })
+    expect(blog.getAttribute('href')).not.toMatch(/^javascript:/i)
+    expect(requested(fetchMock, '/users/mona')).toHaveLength(1)
+
+    // Repositories on the profile open GitPulse's own dashboard.
+    await userEvent.click(screen.getAllByRole('link', { name: 'mona/app' })[0])
+    expect(window.location.search).toBe('?repo=mona%2Fapp')
+  })
+
+  it('explains that organization events are not analysed', async () => {
+    window.history.replaceState(null, '', '/?user=mona')
+    mockBackend((url) =>
+      url.pathname === '/api/v1/users/mona' ? Response.json(fx.profile('Organization')) : undefined,
+    )
+
+    render(<App />)
+
+    expect(await screen.findByText(/not analysed for organizations/)).toBeInTheDocument()
+  })
+
+  it('shows a clear message for an unknown user', async () => {
+    mockBackend((url) =>
+      url.pathname === '/api/v1/users/ghost123'
+        ? Response.json(
+            { status: 404, code: 'USER_NOT_FOUND', detail: "No GitHub user named 'ghost123'." },
+            { status: 404 },
+          )
+        : undefined,
+    )
+    render(<App />)
+
+    await analyse('ghost123')
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('No GitHub user')
   })
 
   it('opens the dashboard straight from a shared link', async () => {

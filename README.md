@@ -3,10 +3,10 @@
 **GitHub repository & commit analyzer.** GitPulse turns public GitHub activity (commits,
 contributors, languages, pull requests, issues) into factual, descriptive analytics.
 
-> **Status: early development (Phase 5a – file activity and comparison).** Enter a repository to
-> see its overview, recent activity, commits, pull requests, issues, contributors, languages and
-> (on demand) file activity, or compare two repositories side by side. GitHub profile analysis
-> comes next; see [Roadmap](#roadmap).
+> **Status: early development (Phase 5 complete).** Analyse a repository (overview, activity,
+> commits, pull requests, issues, contributors, languages, file activity), compare two repositories,
+> or look at a GitHub user's public profile. Export and open-source documentation come next; see
+> [Roadmap](#roadmap).
 
 <!-- Screenshots: add docs/screenshots/dashboard.png once the repository is published. -->
 
@@ -26,9 +26,11 @@ contributors, languages, pull requests, issues) into factual, descriptive analyt
 - **Languages:** share of code by size.
 - **File activity** (on demand): most frequently changed files, highest churn, busiest
   directories, based on the most recent commits; renames are followed.
+- **Profiles:** enter a username for public facts: repositories, stars received (own repos
+  only), languages by repository, recent public activity. No score; nothing private.
 - **Compare** two repositories: the same facts side by side, charts on a shared scale, no winner.
 - Every view is a shareable link (`?repo=owner/name&range=90d`), and every chart has a table
-  view. Paste `owner/repo` or any GitHub URL.
+  view. Paste `owner/repo`, a username or any GitHub URL.
 
 GitPulse analyses _data_, not _people_: it reports activity, frequency and distribution, and
 every calculated metric has a documented formula in [docs/metrics.md](docs/metrics.md). It
@@ -100,6 +102,7 @@ Use a **fine-grained, read-only, public-repositories** token. Never commit it.
 | GET    | `/api/v1/repositories/{owner}/{repo}/issues`        | Issue activity + all-time totals (PRs excluded)   |
 | GET    | `/api/v1/repositories/{owner}/{repo}/activity`      | Recent-activity indicators (30/90 days)           |
 | GET    | `/api/v1/repositories/{owner}/{repo}/files`         | File activity from recent commits (`sample`)      |
+| GET    | `/api/v1/users/{username}`                          | Public profile analysis                           |
 | GET    | `/api/v1/compare?repos=a/b,c/d`                     | Two repositories side by side                     |
 
 Full reference with examples: [docs/api.md](docs/api.md). Metric definitions:
@@ -134,7 +137,7 @@ Formatting: `./mvnw spotless:apply` (Java, google-java-format) and `npm run form
 3. ✅ Dashboard: charts and responsive layout
 4. ✅ Pull request and issue analytics, recent activity, rate-limit handling
 5. ✅ (5a) File activity, repository comparison, per-cache lifetimes, bounded parallel fetching
-   · (5b) GitHub profile analysis
+   · ✅ (5b) GitHub profile analysis
 6. Export (CSV/JSON) and full open-source documentation
 7. Optional AI features (evaluated, not assumed)
 

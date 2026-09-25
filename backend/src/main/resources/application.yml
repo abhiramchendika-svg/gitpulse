@@ -14,7 +14,7 @@ spring:
   cache:
     type: caffeine
     # commitDetails is configured separately (24h) in CacheConfig.
-    cache-names: repositories,languages,commits,commitCounts,contributors,contributorStats,pullRequests,issues,counts
+    cache-names: repositories,languages,commits,commitCounts,contributors,contributorStats,pullRequests,issues,counts,users,userRepositories,userEvents
     # Each cache keeps at most 500 entries for 10 minutes: fresh enough for activity data,
     # and repeated dashboard loads cost zero GitHub requests.
     caffeine:

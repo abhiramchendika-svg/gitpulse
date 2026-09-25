@@ -489,3 +489,60 @@ curl "http://localhost:8080/api/v1/compare?repos=spring-projects/spring-petclini
 
 Errors: `400 INVALID_INPUT` (not exactly two, invalid, or identical repositories),
 `404 REPOSITORY_NOT_FOUND` (the detail names the missing repository), `429`, `503`.
+
+## `GET /api/v1/users/{username}`
+
+Public profile analysis for a user or organization. Costs about 1 + (1 per 100 repositories,
+max 3) + (up to 3 for events) GitHub requests.
+
+```bash
+curl http://localhost:8080/api/v1/users/torvalds
+```
+
+```json
+{
+  "profile": {
+    "login": "torvalds",
+    "type": "User",
+    "name": "Linus Torvalds",
+    "company": "Linux Foundation",
+    "location": "Portland, OR",
+    "publicRepos": 12,
+    "followers": 325097,
+    "following": 0,
+    "createdAt": "2011-09-03T15:26:22Z",
+    "…": "…"
+  },
+  "meta": {
+    "generatedAt": "2026-09-25T06:09:31Z",
+    "repositoriesTruncated": false,
+    "eventsAnalyzed": true
+  },
+  "statistics": {
+    "repositoriesAnalyzed": 12,
+    "originalRepositories": 9,
+    "forkedRepositories": 3,
+    "archivedRepositories": 1,
+    "starsReceived": 262078,
+    "forksReceived": 66657,
+    "languages": [{ "name": "C", "repositories": 8, "percent": 88.9 }],
+    "pushedLast30Days": 2,
+    "pushedLast90Days": 3,
+    "pushedLastYear": 6,
+    "mostStarred": [
+      { "fullName": "torvalds/linux", "stars": 250078, "…": "…" }
+    ],
+    "recentlyPushed": ["… same shape …"],
+    "createdPerYear": [{ "year": 2011, "repositories": 1 }],
+    "events": {
+      "count": 112,
+      "activeDays": 33,
+      "repositoriesTouched": 2,
+      "byType": [{ "type": "PushEvent", "label": "Pushes", "count": 99 }],
+      "topRepositories": [{ "repository": "torvalds/linux", "events": 110 }]
+    }
+  }
+}
+```
+
+Errors: `400 INVALID_INPUT` (invalid name), `404 USER_NOT_FOUND`, `429`, `503`.

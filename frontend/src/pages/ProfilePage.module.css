@@ -1,0 +1,109 @@
+.page {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.loading,
+.empty {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.header {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.avatar {
+  border-radius: 50%;
+  flex: none;
+}
+
+.identity {
+  min-width: 0;
+}
+
+.name {
+  margin: 0;
+  font-size: 1.35rem;
+  overflow-wrap: anywhere;
+}
+
+.name a {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.name a:hover {
+  text-decoration: underline;
+}
+
+.login {
+  color: var(--text-muted);
+}
+
+.bio {
+  margin: 0.4rem 0 0;
+}
+
+.facts {
+  margin: 0.4rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+
+.eventStack {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.subheading {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.repos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+  font-size: 0.875rem;
+}
+
+.repos li {
+  min-width: 0;
+}
+
+.repoName {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.meta {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.tag {
+  margin-left: 0.4rem;
+  font-size: 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0 0.4rem;
+  color: var(--text-muted);
+}

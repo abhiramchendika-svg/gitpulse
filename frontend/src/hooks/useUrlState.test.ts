@@ -8,6 +8,7 @@ describe('readUrlState', () => {
       range: '90d',
       excludeBots: true,
       compare: null,
+      user: null,
     })
   })
 
@@ -17,6 +18,7 @@ describe('readUrlState', () => {
       range: '1y',
       excludeBots: false,
       compare: null,
+      user: null,
     })
   })
 
@@ -45,8 +47,28 @@ describe('toSearch', () => {
           { owner: 'facebook', repo: 'react' },
           { owner: 'vuejs', repo: 'core' },
         ],
+        user: 'mona',
       }),
     ).toBe('?compare=facebook%2Freact%2Cvuejs%2Fcore')
+  })
+})
+
+describe('profile view', () => {
+  it('reads a valid user and ignores an invalid one', () => {
+    expect(readUrlState('?user=octocat').user).toBe('octocat')
+    expect(readUrlState('?user=-bad').user).toBeNull()
+  })
+
+  it('writes the user without dashboard parameters', () => {
+    expect(
+      toSearch({
+        repo: { owner: 'a', repo: 'b' },
+        range: '90d',
+        excludeBots: true,
+        compare: null,
+        user: 'octocat',
+      }),
+    ).toBe('?user=octocat')
   })
 })
 

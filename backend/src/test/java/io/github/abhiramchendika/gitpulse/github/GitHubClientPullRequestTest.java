@@ -178,6 +178,49 @@ class GitHubClientPullRequestTest {
     assertThat(client.countContributors("o", "r")).isEqualTo(131);
   }
 
+  /**
+   * The repository list lacks fields the single-repository endpoint has (e.g. subscribers_count);
+   * the summary record must still deserialize under Jackson 3's strict primitive handling.
+   */
+  @Test
+  void listUserRepositories_parsesListItemsWithoutSingleRepositoryFields() {
+    server
+        .expect(requestTo(BASE + "/users/mona/repos?sort=pushed&per_page=100"))
+        .andRespond(
+            withSuccess(
+                """
+                [{"name":"app","full_name":"mona/app","html_url":"h","description":null,
+                  "fork":false,"archived":false,"language":"Java","stargazers_count":5,
+                  "forks_count":1,"created_at":"2020-01-01T00:00:00Z",
+                  "pushed_at":"2026-09-01T00:00:00Z"}]
+                """,
+                MediaType.APPLICATION_JSON));
+
+    var result = client.listUserRepositories("mona", 3);
+
+    assertThat(result.items()).hasSize(1);
+    assertThat(result.items().getFirst().stargazersCount()).isEqualTo(5);
+  }
+
+  @Test
+  void getUser_doesNotMapTheEmailAddress() {
+    server
+        .expect(requestTo(BASE + "/users/mona"))
+        .andRespond(
+            withSuccess(
+                """
+                {"login":"mona","type":"User","name":"Mona","email":"mona@example.com",
+                 "public_repos":3,"followers":10,"following":2,
+                 "created_at":"2015-01-01T00:00:00Z"}
+                """,
+                MediaType.APPLICATION_JSON));
+
+    var profile = client.getUser("mona");
+
+    assertThat(profile.login()).isEqualTo("mona");
+    assertThat(profile.toString()).doesNotContain("mona@example.com");
+  }
+
   @Test
   void countPullRequests_emptyList_isZero() {
     server

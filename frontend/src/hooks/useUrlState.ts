@@ -14,21 +14,27 @@ export interface DashboardState {
    * been chosen yet, otherwise the two repositories being compared.
    */
   compare: RepoRef[] | null
+  /** The profile view: a GitHub login, or null. */
+  user: string | null
 }
 
+const LOGIN = /^[A-Za-z0-9][A-Za-z0-9-]{0,38}$/
+
 /**
- * Reads dashboard state from the URL, e.g. ?repo=facebook/react&range=90d&bots=exclude
- * or ?compare=facebook/react,vuejs/core
+ * Reads dashboard state from the URL, e.g. ?repo=facebook/react&range=90d&bots=exclude,
+ * ?compare=facebook/react,vuejs/core or ?user=octocat
  */
 export function readUrlState(search: string): DashboardState {
   const params = new URLSearchParams(search)
   const parsed = parseRepoInput(params.get('repo') ?? '')
   const range = params.get('range')
+  const user = params.get('user')
   return {
     repo: parsed.ok ? parsed.value : null,
     range: RANGES.includes(range as Range) ? (range as Range) : DEFAULT_RANGE,
     excludeBots: params.get('bots') === 'exclude',
     compare: params.has('compare') ? parseCompare(params.get('compare') ?? '') : null,
+    user: user && LOGIN.test(user) ? user : null,
   }
 }
 
@@ -43,8 +49,11 @@ function parseCompare(value: string): RepoRef[] {
 
 export function toSearch(state: DashboardState): string {
   const params = new URLSearchParams()
+  // One view at a time: compare, then a profile, then a repository dashboard.
   if (state.compare !== null) {
     params.set('compare', state.compare.map((r) => `${r.owner}/${r.repo}`).join(','))
+  } else if (state.user !== null) {
+    params.set('user', state.user)
   } else {
     if (state.repo) params.set('repo', `${state.repo.owner}/${state.repo.repo}`)
     if (state.range !== DEFAULT_RANGE) params.set('range', state.range)
@@ -74,7 +83,7 @@ export function useUrlState(): [DashboardState, (next: Partial<DashboardState>) 
     const merged = { ...readUrlState(window.location.search), ...next }
     const url = toSearch(merged)
     // Navigation (a new repository or comparison) gets its own history entry; filters do not.
-    if ('repo' in next || 'compare' in next) {
+    if ('repo' in next || 'compare' in next || 'user' in next) {
       window.history.pushState(null, '', url)
     } else {
       window.history.replaceState(null, '', url)

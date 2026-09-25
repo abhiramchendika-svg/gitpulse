@@ -4,7 +4,8 @@ import { RepoSearchForm } from './components/RepoSearchForm'
 import { useBackendStatus } from './hooks/useBackendStatus'
 import { useUrlState } from './hooks/useUrlState'
 import { HomePage } from './pages/HomePage'
-import { formatRepo } from './utils/parseRepoInput'
+import { ProfilePage } from './pages/ProfilePage'
+import { formatRepo, type RepoRef } from './utils/parseRepoInput'
 import styles from './App.module.css'
 
 // The dashboard and compare pages (and the charting library they use) load only when opened,
@@ -22,8 +23,10 @@ function App() {
   const compareKey = state.compare?.map(formatRepo).join(',') ?? ''
   // Re-read the quota whenever what is being analysed changes.
   const { status, refresh } = useBackendStatus(
-    `${repoKey}|${state.range}|${state.excludeBots}|${compareKey}`,
+    `${repoKey}|${state.range}|${state.excludeBots}|${compareKey}|${state.user ?? ''}`,
   )
+  const openRepository = (repo: RepoRef) => update({ repo, compare: null, user: null })
+  const openUser = (user: string) => update({ user, repo: null, compare: null })
 
   let page
   if (state.compare !== null) {
@@ -31,6 +34,14 @@ function App() {
       <Suspense fallback={<p role="status">Loading…</p>}>
         <ComparePage repos={state.compare} onCompare={(compare) => update({ compare })} />
       </Suspense>
+    )
+  } else if (state.user !== null) {
+    page = (
+      <ProfilePage
+        key={state.user.toLowerCase()}
+        login={state.user}
+        onOpenRepository={openRepository}
+      />
     )
   } else if (state.repo) {
     page = (
@@ -45,9 +56,7 @@ function App() {
       </Suspense>
     )
   } else {
-    page = (
-      <HomePage status={status} onRefreshStatus={refresh} onPick={(repo) => update({ repo })} />
-    )
+    page = <HomePage status={status} onRefreshStatus={refresh} onPick={openRepository} />
   }
 
   return (
@@ -58,15 +67,16 @@ function App() {
           className={styles.brand}
           onClick={(e) => {
             e.preventDefault()
-            update({ repo: null, compare: null })
+            update({ repo: null, compare: null, user: null })
           }}
         >
           GitPulse
         </a>
         <RepoSearchForm
-          key={repoKey}
-          current={state.compare === null ? state.repo : null}
-          onSubmit={(repo) => update({ repo, compare: null })}
+          key={`${repoKey}|${state.user ?? ''}|${state.compare !== null}`}
+          current={state.compare !== null ? '' : (state.user ?? repoKey)}
+          onRepo={openRepository}
+          onUser={openUser}
         />
         <a
           href="?compare="
@@ -74,7 +84,7 @@ function App() {
           aria-current={state.compare !== null ? 'page' : undefined}
           onClick={(e) => {
             e.preventDefault()
-            update({ compare: state.compare ?? [] })
+            update({ compare: state.compare ?? [], user: null })
           }}
         >
           Compare
