@@ -6,6 +6,8 @@
 # --- Backend (Maven) ---
 backend/target/
 backend/.mvn/wrapper/maven-wrapper.jar
+# The built frontend is copied here only inside the Docker build.
+backend/src/main/resources/static/
 
 # --- Frontend (see also frontend/.gitignore) ---
 node_modules/

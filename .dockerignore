@@ -1,0 +1,15 @@
+# Keep the build context small, and secrets out of the image.
+.env
+.env.*
+!.env.example
+.git
+.github
+.claude
+.idea
+.vscode
+docs
+**/node_modules
+frontend/dist
+frontend/coverage
+backend/target
+**/*.log

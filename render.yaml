@@ -1,0 +1,24 @@
+# Render Blueprint: deploys GitPulse as one Docker web service.
+# Render dashboard -> New -> Blueprint -> pick this repository. See docs/deployment.md.
+services:
+  - type: web
+    name: gitpulse
+    runtime: docker
+    plan: free
+    branch: main
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /actuator/health
+    # Deploy only after CI has passed on the pushed commit.
+    autoDeployTrigger: checksPass
+    envVars:
+      # Asked for when the Blueprint is created; stored as a secret by Render, never in git.
+      # Use a fine-grained, read-only token for public repositories.
+      - key: GITHUB_TOKEN
+        sync: false
+      # Render terminates HTTPS in a proxy. Trusting its X-Forwarded-* headers lets the app see
+      # the public https URL, so same-site requests are not mistaken for cross-origin ones.
+      - key: SERVER_FORWARD_HEADERS_STRATEGY
+        value: framework
+      # ANTHROPIC_API_KEY is deliberately not set: on a public site, strangers could run up the
+      # bill. The AI summary stays hidden.

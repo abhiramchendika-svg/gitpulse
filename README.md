@@ -86,6 +86,19 @@ npm run dev
 Open http://localhost:5173 and enter a repository, e.g. `spring-projects/spring-petclinic`.
 The header shows how much GitHub API quota the backend has left.
 
+## Deployment
+
+GitPulse builds into **one Docker image** that serves both the app and the API:
+
+```bash
+docker build -t gitpulse .
+docker run --rm -p 8080:8080 -e GITHUB_TOKEN=<your token> gitpulse
+```
+
+The repository includes a Render Blueprint (`render.yaml`) for a free-tier deployment that
+redeploys automatically after CI passes. Steps, settings and free-tier limits:
+[docs/deployment.md](docs/deployment.md).
+
 ## Environment variables
 
 | Variable                        | Required | Default                 | Purpose                                              |
@@ -175,6 +188,7 @@ Formatting: `./mvnw spotless:apply` (Java, google-java-format) and `npm run form
 | -------------------------------------------------------------- | -------------------------------------------------------- |
 | [docs/api.md](docs/api.md)                                     | REST API reference, errors, request costs, export format |
 | [docs/metrics.md](docs/metrics.md)                             | Definition and formula of every number                   |
+| [docs/deployment.md](docs/deployment.md)                       | Docker image, Render deployment, production settings     |
 | [docs/architecture.md](docs/architecture.md)                   | How it's built and why                                   |
 | [docs/interview-preparation.md](docs/interview-preparation.md) | Talking about the project in interviews                  |
 
