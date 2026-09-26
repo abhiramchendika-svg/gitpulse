@@ -11,6 +11,13 @@ spring:
   mvc:
     problemdetails:
       enabled: true
+  web:
+    resources:
+      cache:
+        # The built frontend (Docker image only): index.html and other unhashed files are
+        # revalidated on every visit; hashed files under /assets/ are cached for a year (WebConfig).
+        cachecontrol:
+          no-cache: true
   cache:
     type: caffeine
     # commitDetails is configured separately (24h) in CacheConfig.
